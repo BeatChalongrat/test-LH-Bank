@@ -37,3 +37,6 @@ jobs:
       - run: python scripts/hr_demo.py setup
       - run: python scripts/hr_demo.py setup
       - run: python scripts/hr_demo.py verify
+      - name: Show service startup diagnostics
+        if: failure()
+        run: docker compose logs --tail 60 api indexer

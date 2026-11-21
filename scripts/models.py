@@ -44,6 +44,11 @@ FILES = {
         "llama.zip",
         "425eeb2a94a9600dadf369a7c9c7dd0141948921efc0fa9ec7872970fffc845d",
     ),
+    "windows_vulkan": (
+        "https://github.com/ggml-org/llama.cpp/releases/download/b12606/llama-b12606-bin-win-vulkan-x64.zip",
+        "vulkan.zip",
+        "76e3c7df27b892bff158bf46f30c3a01aff7ff20a05830d6f492721f9ebc136b",
+    ),
 }
 
 
@@ -70,9 +75,12 @@ def fetch(key, directory):
             os.replace(temp, target)
         finally:
             temp.unlink(missing_ok=True)
-    if key == "windows_server":
+    # The non-root API and indexer read these public weights through a bind mount.
+    if os.name == "posix":
+        target.chmod(0o644)
+    if key in {"windows_server", "windows_vulkan"}:
         with zipfile.ZipFile(target) as archive:
-            archive.extractall(directory / "llama")
+            archive.extractall(directory / ("vulkan" if key == "windows_vulkan" else "llama"))
     print("Verified", name, flush=True)
 
 
@@ -80,6 +88,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--llm", action="store_true")
     parser.add_argument("--windows-server", action="store_true")
+    parser.add_argument("--windows-vulkan", action="store_true")
     args = parser.parse_args()
     directory = Path(os.getenv("MODEL_DIR", ROOT / "models"))
     directory.mkdir(parents=True, exist_ok=True)
@@ -87,5 +96,6 @@ if __name__ == "__main__":
         ["encoder", "tokenizer"]
         + (["llm", "reader", "reader_tokenizer"] if args.llm else [])
         + (["windows_server"] if args.windows_server else [])
+        + (["windows_vulkan"] if args.windows_vulkan else [])
     ):
         fetch(key, directory)
