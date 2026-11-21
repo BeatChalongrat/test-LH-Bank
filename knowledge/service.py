@@ -11,6 +11,7 @@ import sqlalchemy as sa
 
 from .db import (
     MANAGED_REVISION,
+    LOCAL_EMBEDDING_SPACE,
     cache,
     case_documents,
     documents,
@@ -22,6 +23,8 @@ from .db import (
     revision_value,
     tickets,
 )
+from .embedding_api import EmbeddingUnavailable
+from .provider import ProviderBackoff, ProviderCoolingDown
 from .response_policy import POLICY_REF, POLICY_URL
 from .reader import COMPLEX, FACT, Reader
 from .search import query_text, retrieve
@@ -44,6 +47,15 @@ EVIDENCE_INSTRUCTION = "เลือกเอกสารที่มีคำ�
 class Selection:
     index: int
     timings: dict
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class Evidence:
+    score: float
+    choices: list
+    reason: str
+    timings: dict
 
 
 class Generator:
@@ -56,6 +68,19 @@ class Generator:
             self.protocol = "llama" if self.url == "http://llm:8080/v1" else "openai"
         if self.protocol not in {"llama", "openai"}:
             raise ValueError("LLM_PROTOCOL must be auto, llama or openai")
+        if self.protocol == "openai":
+            endpoint = httpx.URL(self.url)
+            if (
+                not endpoint.host
+                or endpoint.scheme not in {"https", "http"}
+                or endpoint.userinfo
+                or endpoint.query
+                or endpoint.fragment
+                or (os.getenv("LLM_API_KEY") and endpoint.scheme != "https")
+            ):
+                raise ValueError(
+                    "Invalid chat API endpoint; bearer credentials require HTTPS"
+                )
         self.reader = Reader.configured() if self.protocol == "llama" else None
         self.routing_revision = self.reader.revision if self.reader else "llm-only"
         primary_slots = int(os.getenv("LLAMA_SLOTS", "0"))
@@ -66,12 +91,15 @@ class Generator:
             if extra := os.getenv("LLAMA_EXTRA_URL"):
                 servers.append((extra, int(os.environ["LLAMA_EXTRA_SLOTS"])))
             self.slots = Slots(servers)
+        self.backoff = ProviderBackoff()
         self.client = httpx.Client(
             timeout=httpx.Timeout(float(os.getenv("LLM_TIMEOUT", "22")), connect=3)
         )
 
     def select(self, question, choices):
         # The model may choose an evidence ID or abstain. Only server-held source text can be returned.
+        if self.protocol == "openai":
+            self.backoff.check()
         diagnostics = {}
         top = choices[0]
         if (
@@ -143,7 +171,7 @@ class Generator:
             ]
             payload = {
                 "temperature": 0,
-                "max_tokens": 32,
+                "max_completion_tokens": 32,
                 "response_format": {
                     "type": "json_schema",
                     "json_schema": {
@@ -188,6 +216,8 @@ class Generator:
         else:
             res = self.client.post(endpoint, headers=headers, json=payload)
         diagnostics["llm_http_ms"] = round((time.perf_counter() - posted) * 1000, 2)
+        if self.protocol == "openai":
+            self.backoff.observe(res)
         res.raise_for_status()
         body = res.json()
         if not isinstance(body, dict) or not isinstance(
@@ -212,6 +242,15 @@ class Generator:
                 raise ValueError("Invalid evidence selection")
             value = matches[0]
         else:
+            usage = body.get("usage") or {}
+            if not isinstance(usage, dict):
+                raise ValueError("Invalid token usage")
+            for field, span in (
+                ("prompt_tokens", "prompt_n"),
+                ("completion_tokens", "predicted_n"),
+            ):
+                if isinstance(usage.get(field), int):
+                    timings[span] = usage[field]
             value = json.loads(body["choices"][0]["message"]["content"])["choice"]
         if value != "NONE" and value not in labels:
             raise ValueError("Invalid evidence selection")
@@ -295,6 +334,7 @@ class Service:
                         POLICY,
                         self.generator.model,
                         model_version,
+                        getattr(self.encoder, "space", LOCAL_EMBEDDING_SPACE),
                         self.generator.url,
                         getattr(self.generator, "protocol", "openai"),
                         getattr(self.generator, "routing_revision", "llm-only"),
@@ -319,20 +359,95 @@ class Service:
                 )
         return Prepared(start, q, rev, key, saved, refusal)
 
+    def lookup(self, user, request):
+        q, rev = request.q, request.revision
+        spans = {}
+        at = time.perf_counter()
+        try:
+            vector = self.encoder.encode([query_text(q)], "query")[0]
+        except ProviderCoolingDown:
+            spans["embedding_ms"] = round((time.perf_counter() - at) * 1000, 2)
+            return Evidence(0.0, [], "embedding_rate_limited", spans)
+        except EmbeddingUnavailable:
+            spans["embedding_ms"] = round((time.perf_counter() - at) * 1000, 2)
+            return Evidence(0.0, [], "embedding_unavailable", spans)
+        spans["embedding_ms"] = round((time.perf_counter() - at) * 1000, 2)
+        checkout = time.perf_counter()
+        with self.engine.connect() as conn:
+            spans["retrieval_checkout_ms"] = round(
+                (time.perf_counter() - checkout) * 1000, 2
+            )
+            ranked = retrieve(
+                conn,
+                self.encoder,
+                q,
+                user.role,
+                rev,
+                subject=user.subject,
+                vector=vector,
+            )
+        spans["retrieval_ms"] = round((time.perf_counter() - at) * 1000, 2)
+        spans["candidates"] = [{"ref": r["ref"], "score": r["score"]} for r in ranked]
+        score = ranked[0]["score"] if ranked else 0.0
+        reason = "insufficient_evidence"
+        choices = []
+        if not ORG.search(q) and (
+            score < self.threshold or not ranked or ranked[0]["overlap"] < 0.12
+        ):
+            reason = "scope"
+        elif score >= self.threshold:
+            choices = [
+                r
+                for r in ranked
+                if r["score"] >= self.threshold
+                and covers_qualifiers(q, r["title"] + " " + r["body"])
+                and not INJECTION.search(normalize(r["body"]))
+            ]
+        return Evidence(score, choices, reason, spans)
+
+    def generate(self, question, choices):
+        at = time.perf_counter()
+        try:
+            result = self.generator.select(question, choices)
+        except httpx.HTTPStatusError as exc:
+            reason = (
+                "provider_rate_limited"
+                if exc.response.status_code == 429
+                else "generator_unavailable"
+            )
+            result = Selection(0, {"provider_status": exc.response.status_code}, reason)
+        except ProviderCoolingDown:
+            result = Selection(0, {}, "provider_rate_limited")
+        except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError):
+            result = Selection(0, {}, "generator_unavailable")
+        timings = result.timings | {
+            "generation_ms": round((time.perf_counter() - at) * 1000, 2)
+        }
+        return Selection(result.index, timings, result.error)
+
     def ask(self, user, question):
-        return self.finish(user, question, self.prepare(user, question))
+        request = self.prepare(user, question)
+        evidence = self.lookup(user, request) if request.needs_inference else None
+        selected = (
+            self.generate(question, evidence.choices)
+            if evidence and evidence.choices
+            else None
+        )
+        return self.finish(user, question, request, evidence, selected)
 
     def finish(
         self,
         user,
         question,
         request,
+        evidence=None,
+        selected=None,
         queue_ms=0.0,
         overloaded=False,
         on_commit=None,
         original_question=None,
     ):
-        start, q, rev, key = request.start, request.q, request.revision, request.key
+        start, rev, key = request.start, request.revision, request.key
         trace = uuid.uuid4().hex
         spans = {
             "model": self.generator.model,
@@ -341,74 +456,30 @@ class Service:
             "threshold": self.threshold,
             "admission_ms": round(queue_ms, 2),
         }
+        score = 0.0
+        sources, hit = [], False
         status, reason, answer = "refused", request.refusal, REFUSAL
-        sources, score, hit = [], 0.0, False
         if request.saved is not None:
             saved = request.saved
             answer, sources, score = saved["answer"], saved["sources"], saved["score"]
             status, reason, hit = "answered", "evidence", True
-        elif overloaded:
-            status, reason, answer = "fallback", "inference_overloaded", OVERLOADED
-        elif request.needs_inference:
-            at = time.perf_counter()
-            vector = self.encoder.encode([query_text(q)], "query")[0]
-            spans["embedding_ms"] = round((time.perf_counter() - at) * 1000, 2)
-            checkout = time.perf_counter()
-            with self.engine.connect() as conn:
-                spans["retrieval_checkout_ms"] = round(
-                    (time.perf_counter() - checkout) * 1000, 2
-                )
-                ranked = retrieve(
-                    conn,
-                    self.encoder,
-                    q,
-                    user.role,
-                    rev,
-                    subject=user.subject,
-                    vector=vector,
-                )
-            spans["retrieval_ms"] = round((time.perf_counter() - at) * 1000, 2)
-            spans["candidates"] = [
-                {"ref": r["ref"], "score": r["score"]} for r in ranked
-            ]
-            score = ranked[0]["score"] if ranked else 0.0
-            status, reason, answer = "fallback", "insufficient_evidence", FALLBACK
-            if not ORG.search(q) and (
-                score < self.threshold or not ranked or ranked[0]["overlap"] < 0.12
-            ):
-                status, reason, answer = "refused", "scope", REFUSAL
-            elif score >= self.threshold:
-                choices = [
-                    r
-                    for r in ranked
-                    if r["score"] >= self.threshold
-                    and covers_qualifiers(q, r["title"] + " " + r["body"])
-                    and not INJECTION.search(normalize(r["body"]))
-                ]
-                if choices:
-                    at = time.perf_counter()
-                    try:
-                        selected_result = self.generator.select(question, choices)
-                        spans.update(selected_result.timings)
-                        idx = selected_result.index
-                        if idx:
-                            selected = choices[idx - 1]
-                            sources = [citation(selected)]
-                            answer = passage(selected)
-                            status, reason, score = (
-                                "answered",
-                                "evidence",
-                                selected["score"],
-                            )
-                    except (
-                        httpx.HTTPError,
-                        ValueError,
-                        KeyError,
-                        TypeError,
-                        IndexError,
-                    ):
-                        reason = "generator_unavailable"
-                    spans["generation_ms"] = round((time.perf_counter() - at) * 1000, 2)
+        elif evidence is not None:
+            spans.update(evidence.timings)
+            score = evidence.score
+            if evidence.reason == "scope":
+                reason = "scope"
+            else:
+                status, reason, answer = "fallback", evidence.reason, FALLBACK
+            if overloaded:
+                status, reason, answer = "fallback", "inference_overloaded", OVERLOADED
+            elif selected:
+                spans.update(selected.timings)
+                if selected.error:
+                    reason = selected.error
+                elif selected.index:
+                    row = evidence.choices[selected.index - 1]
+                    sources, score = [citation(row)], row["score"]
+                    status, reason, answer = "answered", "evidence", passage(row)
         duration = round((time.perf_counter() - start) * 1000, 2)
         now = time.time()
         with self.engine.begin() as conn:

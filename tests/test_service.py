@@ -214,6 +214,20 @@ def test_hot_request_and_overload_ticket_while_inference_is_busy(
             assert busy.result()["status"] == "answered"
 
 
+def test_embedding_outage_falls_back_before_generation(system, encoder, monkeypatch):
+    from knowledge.embedding_api import EmbeddingUnavailable
+
+    api, keys, _, generator = system
+
+    def down(*_):
+        raise EmbeddingUnavailable("upstream offline")
+
+    monkeypatch.setattr(encoder, "encode", down)
+    result = ask(api, keys["one"], "ค่าแท็กซี่เบิกได้สูงสุดกี่บาทต่อเที่ยว")
+    assert result["reason"] == "embedding_unavailable" and result["ticket_id"]
+    assert not generator.seen and not result["sources"]
+
+
 def test_persistent_conversation_and_citations(system):
     api, keys, engine, _ = system
     path = "/api/conversations/" + str(uuid4())

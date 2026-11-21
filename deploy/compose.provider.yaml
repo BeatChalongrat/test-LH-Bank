@@ -1,0 +1,35 @@
+# Full remote inference. Merge after compose.yaml (and after the capacity override when benchmarking).
+x-embeddings: &embeddings
+  EMBEDDING_MODE: api
+  EMBEDDING_BASE_URL: ${LLM_BASE_URL:?Set the approved provider base URL}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:?Set a 384-dimension embedding deployment}
+  EMBEDDING_REVISION: ${EMBEDDING_REVISION:-}
+  EMBEDDING_API_KEY: ${LLM_API_KEY:-}
+  EMBEDDING_TIMEOUT: ${EMBEDDING_TIMEOUT:-4}
+x-chat: &chat
+  LLM_BASE_URL: ${LLM_BASE_URL:?Set the approved provider base URL}
+  LLM_MODEL: ${LLM_MODEL:?Set the chat deployment}
+  LLM_REVISION: ${LLM_REVISION:-${LLM_MODEL}}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  LLM_PROTOCOL: openai
+  EVIDENCE_READER: "off"
+  LLM_TIMEOUT: ${LLM_TIMEOUT:-5}
+services:
+  llm:
+    profiles: [local-llm]
+  api:
+    environment:
+      <<: [*embeddings, *chat]
+      WEB_CONCURRENCY: ${API_WORKERS:-2}
+      INFERENCE_IN_FLIGHT: ${INFERENCE_IN_FLIGHT:-12}
+      INFERENCE_QUEUE_TIMEOUT: ${INFERENCE_QUEUE_TIMEOUT:-0.35}
+      INFERENCE_MAX_WAITERS: ${INFERENCE_MAX_WAITERS:-12}
+      RETRIEVAL_IN_FLIGHT: ${RETRIEVAL_IN_FLIGHT:-12}
+    depends_on: !override
+      seed: {condition: service_completed_successfully}
+  seed:
+    environment:
+      <<: [*embeddings, *chat]
+  indexer:
+    environment:
+      <<: *embeddings

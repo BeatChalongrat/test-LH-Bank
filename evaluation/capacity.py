@@ -6,6 +6,7 @@ import hashlib
 import http.client
 import json
 import math
+import os
 import random
 import subprocess
 import threading
@@ -20,11 +21,12 @@ import httpx
 from .capacity_workload import EXECUTIVE, HOT, cold_case
 
 ROOT = Path(__file__).resolve().parents[1]
+STATE = ROOT / os.getenv("CAPACITY_STATE_DIR", "var/capacity")
 COMPOSE = [
     "docker",
     "compose",
     "-p",
-    "folio-capacity",
+    os.getenv("CAPACITY_PROJECT", "folio-capacity"),
     "-f",
     "compose.yaml",
     "-f",
@@ -77,7 +79,7 @@ async def run(args):
             await asyncio.sleep(1)
         else:
             raise RuntimeError("The isolated benchmark API did not become ready")
-    users = json.loads((ROOT / "var/capacity/identities.json").read_text())
+    users = json.loads((STATE / "identities.json").read_text())
     if len(users) != 5000:
         raise ValueError("Provision 5,000 isolated benchmark identities first")
     # Reset only this disposable project's answer cache. Operational data stays in the live stack.
@@ -93,7 +95,7 @@ async def run(args):
         rng.shuffle(block)
         expected_hot.extend(block)
     results = []
-    rows = ROOT / "var/capacity" / (args.out.stem + ".jsonl")
+    rows = STATE / (args.out.stem + ".jsonl")
     cold_index = 0
     seen = set()
     plan = []
@@ -250,6 +252,7 @@ async def run(args):
         "corpus": "8 mock documents; one organization; role-scoped retrieval",
         "profile": "open-loop, seeded randomized 60% hot / 40% unique substantive scenario variants",
         "endpoint": "new_conversation_message" if args.chat else "api_ask",
+        "upstream": args.upstream,
         "target_rps": args.rps,
         "requests": args.count,
         "responses": len(results),
@@ -285,6 +288,12 @@ async def run(args):
         "reader_inference": stats(
             [r["reader_ms"] for r in modeled if "reader_ms" in r]
         ),
+        "embedding_roundtrip": stats(
+            [r["embedding_ms"] for r in spans if "embedding_ms" in r]
+        ),
+        "lookup_admission": stats(
+            [r["lookup_admission_ms"] for r in spans if "lookup_admission_ms" in r]
+        ),
         "llm_http": stats([r["llm_http_ms"] for r in modeled if "llm_http_ms" in r]),
         "launch_lag": stats([r["launch_lag_ms"] for r in results]),
         "retrieval": stats([r["retrieval_ms"] for r in spans if "retrieval_ms" in r]),
@@ -318,6 +327,9 @@ async def run(args):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
+    p.add_argument(
+        "--upstream", choices=["local", "hosted", "http-fixture"], default="local"
+    )
     p.add_argument("--rps", type=float, default=18)
     p.add_argument("--count", type=int, default=32400)
     p.add_argument("--out", type=Path, required=True)

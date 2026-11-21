@@ -15,8 +15,8 @@ import sqlalchemy as sa
 
 from .db import MANAGED_REVISION, chunks, documents, engine_for, pdf_files
 from .documents import audit, bump_epoch
-from .encoder import Encoder
-from .ingest import embed_rows
+from .embedding_api import configured_encoder
+from .ingest import check_space, embed_rows
 
 log = logging.getLogger(__name__)
 ERRORS = {
@@ -110,6 +110,7 @@ def extract(content, filename):
 
 def work_once(engine, encoder):
     with engine.begin() as conn:
+        check_space(conn, encoder)
         job = claim(conn)
     if job is None:
         return False
@@ -163,6 +164,7 @@ def work_once(engine, encoder):
         if state is None:
             return True
         if not error:
+            check_space(conn, encoder)
             conn.execute(chunks.insert(), rows)
             bump_epoch(conn)
         audit(
@@ -183,12 +185,14 @@ def work_once(engine, encoder):
 def main():
     logging.basicConfig(level=logging.INFO)
     engine = engine_for()
-    encoder = Encoder()
+    encoder = configured_encoder()
     try:
         while True:
             if not work_once(engine, encoder):
                 time.sleep(2)
     finally:
+        if client := getattr(encoder, "client", None):
+            client.close()
         engine.dispose()
 
 

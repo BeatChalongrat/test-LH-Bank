@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 from knowledge.db import ROOT, engine_for, initialize, revision
-from knowledge.encoder import Encoder
+from knowledge.embedding_api import configured_encoder
 from knowledge.ingest import ingest
 from knowledge.search import retrieve
 from knowledge.security import User
@@ -14,7 +14,7 @@ from knowledge.service import Generator, Service
 
 
 def run(cases, out):
-    encoder, generator = Encoder(), Generator()
+    encoder, generator = configured_encoder(), Generator()
     with tempfile.TemporaryDirectory() as temp:
         engine = engine_for("sqlite:///" + Path(temp, "evaluation.db").as_posix())
         initialize(engine)

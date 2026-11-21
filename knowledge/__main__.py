@@ -25,8 +25,8 @@ from .db import (
     tickets,
 )
 from .documents import bump_epoch
-from .encoder import Encoder
-from .ingest import activate, ingest
+from .embedding_api import configured_encoder
+from .ingest import activate, ingest, reembed
 from .security import ROLES, provision
 from .web_auth import issue_invite
 
@@ -50,12 +50,15 @@ def main():
     sub.add_parser("activate").add_argument("revision")
     sub.add_parser("trace").add_argument("id")
     sub.add_parser("prune")
+    sub.add_parser("reembed")
     args = p.parse_args()
     engine = engine_for()
     if args.action not in {"issue-invite", "revoke-sessions"}:
         initialize(engine)
-    if args.action in {"bootstrap", "ingest"}:
-        print(json.dumps(ingest(engine, Encoder(), args.catalog)))
+    if args.action == "reembed":
+        print(json.dumps(reembed(engine, configured_encoder())))
+    elif args.action in {"bootstrap", "ingest"}:
+        print(json.dumps(ingest(engine, configured_encoder(), args.catalog)))
         if (
             args.action == "bootstrap"
             and args.with_test_accounts

@@ -13,12 +13,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
+from .ingest import check_space
 from .agent import install_agent
 from .db import ROOT, engine_for, events, revision, tickets
 from .documents import install_documents
-from .encoder import Encoder
+from .embedding_api import configured_encoder
 from .security import authenticate
-from .service import Generator, Service
+from .service import Evidence, Generator, Service
 from .web_auth import install_browser_auth
 from .workspace import install_workspace
 
@@ -28,13 +29,45 @@ class Question(BaseModel):
     question: str = Field(min_length=2, max_length=1200)
 
 
+async def run_stage(gate, workers, wait, backlog, fn, *args):
+    """Acquire before entering a worker thread. Return None on bounded queue overflow."""
+    started = time.perf_counter()
+    if gate.value == 0 and gate.statistics().tasks_waiting >= backlog:
+        return None, 0.0
+    with anyio.move_on_after(wait) as scope:
+        await gate.acquire()
+    delay = (time.perf_counter() - started) * 1000
+    if scope.cancelled_caught:
+        return None, delay
+    try:
+        return await anyio.to_thread.run_sync(fn, *args, limiter=workers), delay
+    finally:
+        gate.release()
+
+
 def create_app(service=None):
     @asynccontextmanager
     async def lifespan(app):
         managed = service is None
-        app.state.service = service or Service(engine_for(), Encoder(), Generator())
+        app.state.service = service or Service(
+            engine_for(), configured_encoder(), Generator()
+        )
+        if managed:
+            with app.state.service.engine.connect() as conn:
+                check_space(conn, app.state.service.encoder)
         in_flight = int(os.getenv("INFERENCE_IN_FLIGHT", "16"))
+        if not 1 <= in_flight <= 256:
+            raise ValueError("INFERENCE_IN_FLIGHT must be 1–256")
+        app.state.inference_backlog = int(
+            os.getenv("INFERENCE_MAX_WAITERS", str(in_flight * 2))
+        )
+        if not 0 <= app.state.inference_backlog <= 4096:
+            raise ValueError("INFERENCE_MAX_WAITERS must be 0–4096")
         app.state.inference_gate = anyio.Semaphore(in_flight)
+        app.state.lookup_workers = anyio.CapacityLimiter(
+            int(os.getenv("RETRIEVAL_IN_FLIGHT", "16"))
+        )
+        app.state.lookup_gate = anyio.Semaphore(app.state.lookup_workers.total_tokens)
         app.state.model_workers = anyio.CapacityLimiter(in_flight)
         app.state.inference_wait = float(os.getenv("INFERENCE_QUEUE_TIMEOUT", "8"))
         if not math.isfinite(app.state.inference_wait) or app.state.inference_wait <= 0:
@@ -44,6 +77,8 @@ def create_app(service=None):
         finally:
             if managed:
                 app.state.service.generator.client.close()
+                if client := getattr(app.state.service.encoder, "client", None):
+                    client.close()
                 app.state.service.engine.dispose()
 
     app = FastAPI(
@@ -120,28 +155,33 @@ def create_app(service=None):
         request = await anyio.to_thread.run_sync(service.prepare, user, question)
         if not request.needs_inference:
             return await anyio.to_thread.run_sync(finish, user, question, request)
-        at = time.perf_counter()
-        gate = app.state.inference_gate
-        with anyio.move_on_after(app.state.inference_wait) as scope:
-            await gate.acquire()
-        queue_ms = (time.perf_counter() - at) * 1000
-        # A permit may arrive in the same loop iteration as the deadline.
-        # Only a cancelled acquire failed; a successful acquire must be released.
-        if scope.cancelled_caught:
-            return await anyio.to_thread.run_sync(
-                finish, user, question, request, queue_ms, True
-            )
-        try:
-            return await anyio.to_thread.run_sync(
-                finish,
-                user,
+        evidence, lookup_wait = await run_stage(
+            app.state.lookup_gate,
+            app.state.lookup_workers,
+            app.state.inference_wait,
+            app.state.inference_backlog,
+            service.lookup,
+            user,
+            request,
+        )
+        if evidence is None:
+            evidence = Evidence(0.0, [], "retrieval_overloaded", {})
+        evidence.timings["lookup_admission_ms"] = round(lookup_wait, 2)
+        selected, queue_ms, overloaded = None, 0.0, False
+        if evidence.choices:
+            selected, queue_ms = await run_stage(
+                app.state.inference_gate,
+                app.state.model_workers,
+                app.state.inference_wait,
+                app.state.inference_backlog,
+                service.generate,
                 question,
-                request,
-                queue_ms,
-                limiter=app.state.model_workers,
+                evidence.choices,
             )
-        finally:
-            gate.release()
+            overloaded = selected is None
+        return await anyio.to_thread.run_sync(
+            finish, user, question, request, evidence, selected, queue_ms, overloaded
+        )
 
     @app.post("/api/ask")
     async def ask(body: Question, user=Depends(current)):
@@ -214,6 +254,7 @@ def create_app(service=None):
         ]
         lines += [f'knowledge_queries_5m{{reason="{r}"}} {n}' for r, n in recent]
         lines += [
+            f"knowledge_retrieval_waiters {app.state.lookup_gate.statistics().tasks_waiting}",
             f"knowledge_inference_slots_available {app.state.inference_gate.value}",
             f"knowledge_inference_waiters {app.state.inference_gate.statistics().tasks_waiting}",
             f"knowledge_cache_hits_24h {hits}",

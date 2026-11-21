@@ -50,7 +50,12 @@ def retrieve(conn, encoder, query, role, revision, limit=3, subject="", vector=N
         words = grams(" ".join([row["doc_id"], row["title"], row["tags"], row["body"]]))
         overlap = len(tokens & words) / max(1, len(tokens))
         # E5 cosine scores cluster near 0.8; combine a rescaled semantic signal and Thai trigrams.
-        semantic = max(0.0, min(1.0, (dense - 0.72) / 0.25))
+        scaled = (
+            dense
+            if getattr(encoder, "space", "").startswith("api-")
+            else (dense - 0.72) / 0.25
+        )
+        semantic = max(0.0, min(1.0, scaled))
         row.update(score=round(0.52 * semantic + 0.48 * overlap, 4), overlap=overlap)
         ranked.append(row)
     return sorted(ranked, key=lambda r: (-r["score"], r["ref"]))[:limit]

@@ -11,6 +11,7 @@ STATE = Path(os.getenv("STATE_DIR", ROOT / "var"))
 meta = sa.MetaData()
 C = sa.Column
 T = sa.String
+LOCAL_EMBEDDING_SPACE = "multilingual-e5-small-761b726"
 MANAGED_REVISION = "managed-pdf-v1"
 ROLE_BITS = {"employee": 1, "reviewer": 2, "executive": 4, "admin": 8}
 

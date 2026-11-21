@@ -17,10 +17,20 @@ groups:
         labels: {severity: high}
         annotations: {summary: "Query p95 exceeds three seconds"}
       - alert: KnowledgeInferenceSaturated
-        expr: sum(knowledge_queries_5m{reason="inference_overloaded"}) / clamp_min(sum(knowledge_queries_5m),1) > 0.01
+        expr: sum(knowledge_queries_5m{reason=~"inference_overloaded|retrieval_overloaded"}) / clamp_min(sum(knowledge_queries_5m),1) > 0.01
         for: 5m
         labels: {severity: high}
         annotations: {summary: "More than one percent of questions exceeded the inference queue budget"}
+      - alert: KnowledgeProviderThrottled
+        expr: sum(knowledge_queries_5m{reason=~"provider_rate_limited|embedding_rate_limited"}) > 0
+        for: 2m
+        labels: {severity: warning}
+        annotations: {summary: "Provider is rate limiting requests; check provider quotas"}
+      - alert: KnowledgeEmbeddingsUnavailable
+        expr: sum(knowledge_queries_5m{reason="embedding_unavailable"}) / clamp_min(sum(knowledge_queries_5m),1) > 0.02
+        for: 5m
+        labels: {severity: high}
+        annotations: {summary: "Embedding failures exceed two percent"}
       - alert: KnowledgeReviewBacklog
         expr: knowledge_oldest_open_seconds > 86400
         for: 30m

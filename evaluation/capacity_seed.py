@@ -7,7 +7,7 @@ import os
 import secrets
 
 from knowledge.db import ROOT, STATE, accounts, engine_for, initialize, insert_for
-from knowledge.encoder import Encoder
+from knowledge.embedding_api import configured_encoder
 from knowledge.ingest import ingest
 
 
@@ -16,7 +16,7 @@ def main():
     if engine.url.database != "capacity":
         raise SystemExit("Capacity seed requires a database named capacity")
     initialize(engine)
-    print(ingest(engine, Encoder(), ROOT / "data/catalog.json"))
+    print(ingest(engine, configured_encoder(), ROOT / "data/catalog.json"))
     secret_file = STATE / "accounts.secret"
     if not secret_file.exists():
         with os.fdopen(

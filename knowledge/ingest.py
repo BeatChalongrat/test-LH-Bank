@@ -7,9 +7,11 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import sqlalchemy as sa
 from pypdf import PdfReader
 
-from .db import chunks, insert_for, settings
+
+from .db import LOCAL_EMBEDDING_SPACE, chunks, insert_for, settings
 
 
 def ocr_page(path, number):
@@ -94,6 +96,28 @@ def split_blocks(text, limit=640):
         yield text
 
 
+def check_space(conn, encoder, initialize=False):
+    space = getattr(encoder, "space", LOCAL_EMBEDDING_SPACE)
+    stored = conn.scalar(
+        sa.select(settings.c.value).where(settings.c.name == "embedding_space")
+    )
+    if stored is None:
+        if conn.scalar(sa.select(chunks.c.ref).limit(1)):
+            stored = LOCAL_EMBEDDING_SPACE
+        if initialize:
+            stmt = insert_for(conn, settings).values(
+                name="embedding_space", value=stored or space
+            )
+            conn.execute(stmt.on_conflict_do_nothing(index_elements=["name"]))
+            stored = conn.scalar(
+                sa.select(settings.c.value).where(settings.c.name == "embedding_space")
+            )
+    if (stored or LOCAL_EMBEDDING_SPACE) != space:
+        raise ValueError(
+            "Embedding model differs from the index. Use a separate database or run reembed in maintenance."
+        )
+
+
 def ingest(engine, encoder, catalog):
     catalog = Path(catalog).resolve()
     docs = json.loads(catalog.read_text(encoding="utf-8-sig"))
@@ -135,8 +159,19 @@ def ingest(engine, encoder, catalog):
     if not rows:
         raise ValueError("Empty catalog")
     release = digest.hexdigest()[:24]
+    with engine.begin() as conn:
+        check_space(conn, encoder, initialize=True)
+        existing = conn.scalar(
+            sa.select(sa.func.count())
+            .select_from(chunks)
+            .where(chunks.c.revision == release)
+        )
+        if existing == len(rows):
+            activate(conn, release)
+            return {"revision": release, "documents": len(ids), "chunks": len(rows)}
     embed_rows(encoder, rows, release, engine.dialect.name)
     with engine.begin() as conn:
+        check_space(conn, encoder)
         statement = insert_for(conn, chunks).on_conflict_do_nothing(
             index_elements=["revision", "ref"]
         )
@@ -163,3 +198,55 @@ def activate(conn, release):
     conn.execute(
         stmt.on_conflict_do_update(index_elements=["name"], set_={"value": release})
     )
+
+
+def reembed(engine, encoder):
+    """Offline, atomic rebuild of catalog history and uploaded chunks in their existing ACLs."""
+    from .documents import bump_epoch
+
+    with engine.begin() as conn:
+        if conn.dialect.name == "postgresql":
+            conn.execute(sa.text("LOCK TABLE chunks IN EXCLUSIVE MODE"))
+        last = None
+        count = 0
+        while True:
+            stmt = sa.select(
+                chunks.c.revision,
+                chunks.c.ref,
+                chunks.c.title,
+                chunks.c.tags,
+                chunks.c.body,
+            )
+            if last:
+                stmt = stmt.where(sa.tuple_(chunks.c.revision, chunks.c.ref) > last)
+            rows = (
+                conn.execute(stmt.order_by(chunks.c.revision, chunks.c.ref).limit(12))
+                .mappings()
+                .all()
+            )
+            if not rows:
+                break
+            vectors = encoder.encode(
+                [f"{r['title']} {r['tags']}\n{r['body']}" for r in rows], "passage"
+            )
+            for row, vector in zip(rows, vectors, strict=True):
+                conn.execute(
+                    chunks.update()
+                    .where(
+                        chunks.c.revision == row["revision"], chunks.c.ref == row["ref"]
+                    )
+                    .values(
+                        embedding=vector.tobytes()
+                        if conn.dialect.name == "sqlite"
+                        else vector
+                    )
+                )
+            last = (rows[-1]["revision"], rows[-1]["ref"])
+            count += len(rows)
+        space = getattr(encoder, "space", LOCAL_EMBEDDING_SPACE)
+        stmt = insert_for(conn, settings).values(name="embedding_space", value=space)
+        conn.execute(
+            stmt.on_conflict_do_update(index_elements=["name"], set_={"value": space})
+        )
+        bump_epoch(conn)
+    return {"chunks_reembedded": count}

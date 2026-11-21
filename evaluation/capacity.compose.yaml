@@ -13,7 +13,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://desk_owner:${DB_PASSWORD}@db/capacity
     volumes:
-      - ./var/capacity:/state
+      - ${CAPACITY_STATE_DIR:-./var/capacity}:/state
     command: ["python","-m","evaluation.capacity_seed"]
   indexer:
     environment:

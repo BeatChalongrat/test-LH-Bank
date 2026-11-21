@@ -1,0 +1,4 @@
+# Merge after the provider overlay for a benchmark fully isolated from the main portal.
+services:
+  api:
+    networks: !override [default]
