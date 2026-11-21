@@ -40,3 +40,29 @@ jobs:
       - name: Show service startup diagnostics
         if: failure()
         run: docker compose logs --tail 60 api indexer
+  provider-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CAPACITY_PROJECT: provider-capacity
+      CAPACITY_STATE_DIR: ./var/provider-capacity
+      LLM_BASE_URL: http://fixture:8080/v1
+      LLM_MODEL: fixture-first-candidate
+      EMBEDDING_MODEL: fixture-constant
+      COMPOSE_PROJECT_NAME: provider-capacity
+      COMPOSE_FILE: compose.yaml:evaluation/capacity.compose.yaml:deploy/compose.provider.yaml:evaluation/provider-capacity.compose.yaml:evaluation/provider-fixture.compose.yaml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python scripts/configure.py
+      - run: python -m pip install 'httpx==0.28.1'
+      - run: docker compose up -d --build --wait api
+      - name: Check all inference goes through HTTP
+        run: |
+          docker compose exec -T api python -c "from pathlib import Path; assert not list(Path('/models').glob('*.onnx'))"
+          python -m evaluation.capacity --upstream http-fixture --chat --rps 2 --count 30 --out var/provider-capacity/smoke.json
+      - name: Show service startup diagnostics
+        if: failure()
+        run: docker compose logs --tail 40 api seed fixture
