@@ -14,6 +14,8 @@ python scripts/open_workspace.py --admin
 
 ใน **ผู้ดูแลระบบ AI → ผู้ให้บริการโมเดล** กด **เพิ่มโปรไฟล์** ตั้งชื่อ เลือกประเภทงาน ผู้ให้บริการ กรอก model/deployment ID และ API key ของบัญชีที่มีสิทธิ์ใช้โมเดลนั้น จากนั้นกด **บันทึก → ทดสอบ → เลือกใช้** การทดสอบส่งข้อความตัวอย่างหนึ่งรายการและอาจมีค่าบริการ โปรไฟล์ใหม่จะเริ่มใช้กับแชตเมื่อผู้ดูแลกดเลือก
 
+![หน้าต่างเพิ่มโปรไฟล์ในพอร์ทัลผู้ดูแล](provider-admin.png)
+
 1. สำหรับการติดตั้งใหม่ ให้เพิ่มโปรไฟล์ประเภท **สร้าง embeddings** ก่อน เช่น OpenAI `text-embedding-3-small` ระบบจะเริ่มจัดทำดัชนีที่ worker โดยอัตโนมัติ ก่อนดัชนีพร้อม `/health/ready` จะแสดง `setup_required` และแชตแจ้งให้รอ
 2. เพิ่มโปรไฟล์ประเภท **ตอบแชต** ได้หลายชุด เลือกโปรไฟล์เดียวเป็นตัวใช้งาน คำถามถัดไปใช้โมเดลที่เลือกทันที ทุก API worker อ่านการเลือกเดียวกัน คำขอที่กำลังประมวลผลสามารถจบด้วยรุ่นที่เริ่มต้น แคชแยกตาม provider, รุ่นโปรไฟล์, โมเดล และสิทธิ์
 3. เมื่อดัชนีพร้อม ให้รัน `python scripts/hr_demo.py setup` และ `python scripts/hr_demo.py verify` เพื่อตรวจ HR กับนอก HR ด้วย deployment ที่เลือก ค่า threshold ต้องทวนกับชุดเฉลยขององค์กร
@@ -22,7 +24,8 @@ python scripts/open_workspace.py --admin
 |---|---|
 | OpenAI | Chat Completions ที่รองรับ strict JSON schema และ embeddings 384 มิติ |
 | Anthropic Claude | Messages API พร้อม forced tool use เพื่อเลือกหลักฐาน |
-| Google Gemini, Groq, OpenRouter | Chat ผ่าน OpenAI-compatible endpoint เลือกรุ่นที่รองรับ structured output ตาม schema |
+| Google Gemini, OpenRouter | Chat ผ่าน OpenAI-compatible endpoint และ embeddings สำหรับรุ่นที่คืนเวกเตอร์ 384 มิติได้ ทดสอบโปรไฟล์เพื่อตรวจมิติจริง |
+| Groq | Chat ผ่าน OpenAI-compatible endpoint เลือกรุ่นที่รองรับ strict structured output |
 | Gateway ขององค์กร | Chat และ embeddings ตามสัญญา API ของ gateway ผู้ดูแลเครื่องเพิ่ม HTTPS base URL ที่อนุมัติใน `PROVIDER_GATEWAYS` แยกหลายปลายทางด้วยจุลภาค แล้วเปิดบริการใหม่ |
 
 หน้า Admin แสดงชื่อโมเดล สถานะ และผู้ให้บริการ คีย์ที่บันทึกจะเข้ารหัสด้วย Fernet ก่อนลง DB และไม่ส่งกลับ browser ผู้ดูแลเปลี่ยนคีย์ได้โดยไม่ต้องเปลี่ยนโมเดล หรือลบโปรไฟล์ที่เลิกใช้ การเปลี่ยนโมเดลให้สร้างโปรไฟล์ใหม่ ทดสอบ แล้วกดเลือกใช้ สำรอง `PROVIDER_ENCRYPTION_KEY` จาก secret manager แยกจาก DB และใช้ค่าเดียวกันบน API, seed และ indexer ทุก replica เมื่อให้บริการนอก loopback ให้ใช้ HTTPS และ SSO ผู้ดูแลตามคู่มือ D2 [OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs) · [Anthropic](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools) · [Gemini](https://ai.google.dev/gemini-api/docs/openai) · [Groq](https://console.groq.com/docs/structured-outputs) · [OpenRouter](https://openrouter.ai/docs/features/structured-outputs)

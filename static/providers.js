@@ -64,6 +64,9 @@ async function loadProviders(seq) {
     }));
     if (!active && (profile.purpose === "chat" || data.embedding_mode === "managed")) {
       actions.append(providerAction("เลือกใช้", async () => {
+        if (profile.purpose === "embedding" && !window.confirm(
+          "เริ่มสร้างดัชนีด้วย " + profile.name + " หรือไม่ ระบบจะส่งข้อความเอกสาร รวมถึงเอกสารจำกัดสิทธิ์ ไปยัง " + vendor
+        )) return;
         await api("/api/admin/provider-routes/" + profile.purpose, {profile_id: profile.id, version: route.version});
         await show("admin");
       }));

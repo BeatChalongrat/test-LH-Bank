@@ -1,0 +1,102 @@
+{
+  "corpus": "8 mock documents; one organization; role-scoped retrieval",
+  "profile": "open-loop, seeded randomized 60% hot / 40% unique substantive scenario variants",
+  "endpoint": "new_conversation_message",
+  "upstream": "http-fixture",
+  "target_rps": 18.0,
+  "requests": 5000,
+  "responses": 5000,
+  "elapsed_s": 278.803,
+  "completed_rps": 17.93,
+  "distinct_subjects": 5000,
+  "unique_cold_questions": 2000,
+  "actual_cache_hits": 3000,
+  "cache_mix_mismatches": 0,
+  "verified_responses": 4046,
+  "verified_within_3s": 4046,
+  "http_codes": {
+    "200": 5000
+  },
+  "reasons": {
+    "evidence": 4046,
+    "inference_overloaded": 954
+  },
+  "all": {
+    "p50_ms": 76.94,
+    "p95_ms": 1464.97,
+    "p99_ms": 1546.48
+  },
+  "cold": {
+    "p50_ms": 1157.05,
+    "p95_ms": 1513.24,
+    "p99_ms": 1607.95
+  },
+  "warm": {
+    "p50_ms": 44.79,
+    "p95_ms": 129.83,
+    "p99_ms": 258.52
+  },
+  "traces_joined": 5000,
+  "generation_calls": 1046,
+  "decision_routes": {
+    "llm": 1046
+  },
+  "replica_completions": {},
+  "server_admission": {
+    "p50_ms": 334.75,
+    "p95_ms": 352.3,
+    "p99_ms": 356.49
+  },
+  "reader_inference": {
+    "p50_ms": null,
+    "p95_ms": null,
+    "p99_ms": null
+  },
+  "embedding_roundtrip": {
+    "p50_ms": 105.07,
+    "p95_ms": 114.47,
+    "p99_ms": 128.95
+  },
+  "lookup_admission": {
+    "p50_ms": 0.11,
+    "p95_ms": 0.25,
+    "p99_ms": 0.94
+  },
+  "llm_http": {
+    "p50_ms": 1005.04,
+    "p95_ms": 1015.17,
+    "p99_ms": 1029.52
+  },
+  "launch_lag": {
+    "p50_ms": 0.51,
+    "p95_ms": 1.05,
+    "p99_ms": 4.82
+  },
+  "retrieval": {
+    "p50_ms": 117.4,
+    "p95_ms": 149.54,
+    "p99_ms": 205.67
+  },
+  "model_roundtrip": {
+    "p50_ms": 1005.23,
+    "p95_ms": 1015.42,
+    "p99_ms": 1029.73
+  },
+  "queue_and_transport_estimate": {
+    "p50_ms": null,
+    "p95_ms": null,
+    "p99_ms": null
+  },
+  "prompt_compute": {
+    "p50_ms": null,
+    "p95_ms": null,
+    "p99_ms": null
+  },
+  "tokens_evaluated": {
+    "prompt": 0,
+    "output": 0
+  },
+  "trace_log_sha256": "c9dcc1fb6059d96e835d6d9cd60776eae07a0a30e0ae0637e79f88f249afc103",
+  "worst_minute_p95_ms": 1478.29,
+  "passed": false
+}

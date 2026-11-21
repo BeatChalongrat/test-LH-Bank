@@ -12,11 +12,11 @@ CATALOG = {
     "anthropic": ("Anthropic Claude", "https://api.anthropic.com/v1", ("chat",)),
     "openai": ("OpenAI", "https://api.openai.com/v1", ("chat", "embedding")),
     "groq": ("Groq", "https://api.groq.com/openai/v1", ("chat",)),
-    "openrouter": ("OpenRouter", "https://openrouter.ai/api/v1", ("chat",)),
+    "openrouter": ("OpenRouter", "https://openrouter.ai/api/v1", ("chat", "embedding")),
     "gemini": (
         "Google Gemini",
         "https://generativelanguage.googleapis.com/v1beta/openai",
-        ("chat",),
+        ("chat", "embedding"),
     ),
 }
 
