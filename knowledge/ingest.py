@@ -200,7 +200,7 @@ def activate(conn, release):
     )
 
 
-def reembed(engine, encoder):
+def reembed(engine, encoder, profile_id=None):
     """Offline, atomic rebuild of catalog history and uploaded chunks in their existing ACLs."""
     from .documents import bump_epoch
 
@@ -248,5 +248,17 @@ def reembed(engine, encoder):
         conn.execute(
             stmt.on_conflict_do_update(index_elements=["name"], set_={"value": space})
         )
+        if profile_id:
+            from .db import provider_routes
+
+            conn.execute(
+                provider_routes.update()
+                .where(provider_routes.c.purpose == "embedding")
+                .values(
+                    profile_id=profile_id,
+                    version=provider_routes.c.version + 1,
+                    actor="system/reembed",
+                )
+            )
         bump_epoch(conn)
     return {"chunks_reembedded": count}

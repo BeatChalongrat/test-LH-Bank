@@ -10,6 +10,7 @@
     <script defer src="/static/app.js"></script>
     <script defer src="/static/directory.js"></script>
     <script defer src="/static/documents.js"></script>
+    <script defer src="/static/providers.js"></script>
     <script defer src="/static/agent.js"></script>
   </head>
   <body>
@@ -245,6 +246,14 @@
             <h1>ผู้ดูแลระบบ AI</h1>
             <button id="admin-refresh" class="outline"><i data-icon="refresh-cw"></i>รีเฟรช</button>
           </div>
+          <section id="admin-providers" class="admin-card provider-panel" hidden aria-labelledby="providers-heading">
+            <div class="section-head">
+              <div><h2 id="providers-heading">ผู้ให้บริการโมเดล</h2><p class="muted" id="provider-caption"></p></div>
+              <button type="button" id="provider-add" class="outline"><i data-icon="plus"></i>เพิ่มโปรไฟล์</button>
+            </div>
+            <div id="provider-rows"></div>
+            <p id="provider-result" role="status"></p>
+          </section>
           <section id="admin-documents" class="admin-card" hidden>
             <div class="section-head">
               <h2>เอกสารสำหรับผู้ช่วย AI</h2>
@@ -398,6 +407,19 @@
       </form>
       <p id="login-error" role="alert"></p>
       <button hidden id="logout" class="outline">ออกจากระบบ</button>
+    </dialog>
+    <dialog id="provider-editor" aria-labelledby="provider-title">
+      <form id="provider-form" class="provider-form">
+        <div class="section-head"><h2 id="provider-title">เพิ่มโปรไฟล์โมเดล</h2><button class="quiet" id="provider-close" type="button" aria-label="ปิด"><i data-icon="x"></i></button></div>
+        <label>ชื่อโปรไฟล์<input id="provider-name" maxlength="80" placeholder="เช่น แชตพนักงาน" required></label>
+        <label>ประเภทงาน<select id="provider-purpose"><option value="chat">ตอบแชต</option><option value="embedding">สร้าง embeddings</option></select></label>
+        <label>ผู้ให้บริการ<select id="provider-vendor"></select></label>
+        <label>Model / deployment ID<input id="provider-model" maxlength="150" required></label>
+        <label>API key<input type="password" id="provider-key" autocomplete="new-password" maxlength="8192" required></label>
+        <p class="muted">ระบบเก็บคีย์แบบเข้ารหัส เมื่อบันทึกแล้วสามารถทดสอบก่อนเลือกใช้งานได้</p>
+        <p id="provider-form-error" role="alert"></p>
+        <button type="submit" class="primary">บันทึก</button>
+      </form>
     </dialog>
     <dialog id="doc-dialog">
       <div class="dialog-head">

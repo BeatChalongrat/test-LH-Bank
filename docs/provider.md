@@ -2,7 +2,36 @@
 
 โหมดนี้เรียก API ของ gateway เดียวกันสำหรับสร้างเวกเตอร์และเลือกหลักฐาน พอร์ทัลใช้ PostgreSQL/pgvector, OCR และ worker จัดทำดัชนีในระบบเดิม การติดตั้งใหม่ข้ามขั้นตอนดาวน์โหลดน้ำหนักโมเดลได้ทั้งหมด การจัดทำดัชนีจะส่งข้อความเอกสารรวมถึงเอกสาร HR ไปที่ embedding endpoint ส่วนการตอบแชตจะส่งคำถามและเฉพาะหลักฐานที่ผู้ถามมีสิทธิ์ไปที่ chat endpoint ใช้ deployment ที่องค์กรอนุมัติให้ประมวลผลเอกสารประเภทนั้น
 
-## ติดตั้งใหม่
+## เริ่มจากหน้า Admin โดยไม่ต้องมีคีย์ใน .env
+
+บนเครื่องที่มี Python 3.11+, Git และ Docker Compose สำหรับการติดตั้งใหม่ ให้ clone repo แล้วรัน
+
+```shell
+python scripts/configure.py --admin-providers
+docker compose up -d --build --wait api indexer
+python scripts/open_workspace.py --admin
+```
+
+ใน **ผู้ดูแลระบบ AI → ผู้ให้บริการโมเดล** กด **เพิ่มโปรไฟล์** ตั้งชื่อ เลือกประเภทงาน ผู้ให้บริการ กรอก model/deployment ID และ API key ของบัญชีที่มีสิทธิ์ใช้โมเดลนั้น จากนั้นกด **บันทึก → ทดสอบ → เลือกใช้** การทดสอบส่งข้อความตัวอย่างหนึ่งรายการและอาจมีค่าบริการ โปรไฟล์ใหม่จะเริ่มใช้กับแชตเมื่อผู้ดูแลกดเลือก
+
+1. สำหรับการติดตั้งใหม่ ให้เพิ่มโปรไฟล์ประเภท **สร้าง embeddings** ก่อน เช่น OpenAI `text-embedding-3-small` ระบบจะเริ่มจัดทำดัชนีที่ worker โดยอัตโนมัติ ก่อนดัชนีพร้อม `/health/ready` จะแสดง `setup_required` และแชตแจ้งให้รอ
+2. เพิ่มโปรไฟล์ประเภท **ตอบแชต** ได้หลายชุด เลือกโปรไฟล์เดียวเป็นตัวใช้งาน คำถามถัดไปใช้โมเดลที่เลือกทันที ทุก API worker อ่านการเลือกเดียวกัน คำขอที่กำลังประมวลผลสามารถจบด้วยรุ่นที่เริ่มต้น แคชแยกตาม provider, รุ่นโปรไฟล์, โมเดล และสิทธิ์
+3. เมื่อดัชนีพร้อม ให้รัน `python scripts/hr_demo.py setup` และ `python scripts/hr_demo.py verify` เพื่อตรวจ HR กับนอก HR ด้วย deployment ที่เลือก ค่า threshold ต้องทวนกับชุดเฉลยขององค์กร
+
+| ผู้ให้บริการในหน้า Admin | งานที่รองรับ |
+|---|---|
+| OpenAI | Chat Completions ที่รองรับ strict JSON schema และ embeddings 384 มิติ |
+| Anthropic Claude | Messages API พร้อม forced tool use เพื่อเลือกหลักฐาน |
+| Google Gemini, Groq, OpenRouter | Chat ผ่าน OpenAI-compatible endpoint เลือกรุ่นที่รองรับ structured output ตาม schema |
+| Gateway ขององค์กร | Chat และ embeddings ตามสัญญา API ของ gateway ผู้ดูแลเครื่องเพิ่ม HTTPS base URL ที่อนุมัติใน `PROVIDER_GATEWAYS` แยกหลายปลายทางด้วยจุลภาค แล้วเปิดบริการใหม่ |
+
+หน้า Admin แสดงชื่อโมเดล สถานะ และผู้ให้บริการ คีย์ที่บันทึกจะเข้ารหัสด้วย Fernet ก่อนลง DB และไม่ส่งกลับ browser ผู้ดูแลเปลี่ยนคีย์ได้โดยไม่ต้องเปลี่ยนโมเดล หรือลบโปรไฟล์ที่เลิกใช้ การเปลี่ยนโมเดลให้สร้างโปรไฟล์ใหม่ ทดสอบ แล้วกดเลือกใช้ สำรอง `PROVIDER_ENCRYPTION_KEY` จาก secret manager แยกจาก DB และใช้ค่าเดียวกันบน API, seed และ indexer ทุก replica เมื่อให้บริการนอก loopback ให้ใช้ HTTPS และ SSO ผู้ดูแลตามคู่มือ D2 [OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs) · [Anthropic](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools) · [Gemini](https://ai.google.dev/gemini-api/docs/openai) · [Groq](https://console.groq.com/docs/structured-outputs) · [OpenRouter](https://openrouter.ai/docs/features/structured-outputs)
+
+**เครื่องเดิมที่มีคลัง HR อยู่แล้ว** รัน `python scripts/configure.py` เพื่อสร้าง secret เข้ารหัส อัปเกรดด้วย `docker compose up -d --build --wait api indexer` แล้วเข้า Admin เพื่อเลือก chat provider ได้ทันที หากต้องการย้าย embeddings ออกนอกเครื่อง ให้บันทึกและทดสอบโปรไฟล์ embeddings จด ID ที่แสดง สำรอง DB หยุด api/indexer/llm เปลี่ยน Compose เป็นโหมด admin-providers ตามด้านบน แล้วรัน `docker compose run --rm --no-deps -T seed python -m knowledge reembed --profile PROFILE_ID` ก่อนเปิด api/indexer อีกครั้ง คำสั่งนี้แปลงเวกเตอร์ทุกฉบับและเปิดโปรไฟล์นั้นในธุรกรรมเดียว ใช้กระบวนการเดียวกันเมื่อเปลี่ยนชนิด embedding model ที่มีดัชนีอยู่แล้ว
+
+## ตั้งค่าด้วย environment สำหรับ deployment อัตโนมัติ
+
+
 
 1. รัน `python scripts/configure.py` เพื่อสร้าง secrets ของฐานข้อมูลและเว็บ
 2. เพิ่มค่าด้านล่างใน `.env` ที่สร้างขึ้น ตั้งชื่อ deployment ให้ตรงกับบัญชีของคุณ และใส่ bearer key ทางเครื่องหรือ secret manager ตัวอย่างใช้ endpoint ของ OpenAI รองรับ gateway อื่นที่มีสัญญา API เดียวกัน

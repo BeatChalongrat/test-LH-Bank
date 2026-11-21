@@ -203,6 +203,7 @@ function adminCard(title) {
 }
 async function showAdmin(seq) {
   const root = $("admin-content");
+  $("admin-providers").hidden = me?.role !== "admin";
   $("admin-documents").hidden = me?.role !== "admin";
   if (!me) {
     root.replaceChildren(gated("เข้าสู่ระบบด้วยบัญชีผู้ดูแล AI"));
@@ -212,6 +213,7 @@ async function showAdmin(seq) {
     root.replaceChildren(empty("บัญชีนี้ไม่มีสิทธิ์เปิดหน้าผู้ดูแล AI"));
     return;
   }
+  loadProviders(seq).catch((error) => { if (seq === epoch) $("provider-result").textContent = error.message; });
   root.replaceChildren(empty("กำลังโหลด…"));
   refreshDepartments()
     .then(() => loadDocuments(seq))

@@ -1,0 +1,30 @@
+# Start with no model weights or third-party credentials. Chat and embeddings are configured in Admin.
+services:
+  llm:
+    profiles: [local-llm]
+  seed:
+    environment:
+      EMBEDDING_MODE: managed
+      LLM_PROTOCOL: openai
+      LLM_BASE_URL: https://unconfigured.invalid/v1
+      LLM_MODEL: unconfigured
+  indexer:
+    environment:
+      EMBEDDING_MODE: managed
+      EMBEDDING_TIMEOUT: ${EMBEDDING_TIMEOUT:-4}
+  api:
+    environment:
+      EMBEDDING_MODE: managed
+      EMBEDDING_TIMEOUT: ${EMBEDDING_TIMEOUT:-4}
+      LLM_PROTOCOL: openai
+      LLM_BASE_URL: https://unconfigured.invalid/v1
+      LLM_MODEL: unconfigured
+      LLM_API_KEY: ""
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-5}
+      WEB_CONCURRENCY: ${API_WORKERS:-2}
+      INFERENCE_IN_FLIGHT: ${INFERENCE_IN_FLIGHT:-12}
+      INFERENCE_QUEUE_TIMEOUT: ${INFERENCE_QUEUE_TIMEOUT:-0.35}
+      INFERENCE_MAX_WAITERS: ${INFERENCE_MAX_WAITERS:-12}
+      RETRIEVAL_IN_FLIGHT: ${RETRIEVAL_IN_FLIGHT:-12}
+    depends_on: !override
+      seed: {condition: service_completed_successfully}

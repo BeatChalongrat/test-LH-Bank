@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -14,7 +15,17 @@ from knowledge.service import Generator, Service
 
 
 def run(cases, out):
-    encoder, generator = configured_encoder(), Generator()
+    encoder = configured_encoder()
+    if os.getenv("EMBEDDING_MODE") == "managed":
+        from knowledge.provider_profiles import active_profile
+
+        with encoder.engine.connect() as conn:
+            profile = active_profile(conn, "chat")
+        if not profile:
+            raise ValueError("Select a chat provider in Admin")
+        generator = Generator(profile)
+    else:
+        generator = Generator()
     with tempfile.TemporaryDirectory() as temp:
         engine = engine_for("sqlite:///" + Path(temp, "evaluation.db").as_posix())
         initialize(engine)

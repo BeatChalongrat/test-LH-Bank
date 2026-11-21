@@ -104,8 +104,13 @@ async function api(path, data, required = true) {
       422: "กรุณาตรวจสอบข้อมูลที่กรอก",
       503: "บริการยังไม่พร้อม กรุณาลองอีกครั้ง",
     };
+    let providerError;
+    if (path.startsWith("/api/admin/provider")) {
+      const failure = await r.json().catch(() => ({}));
+      if (typeof failure.detail === "string") providerError = failure.detail;
+    }
     const err = new Error(
-      errors[r.status] || "เชื่อมต่อบริการไม่สำเร็จ กรุณาลองอีกครั้ง",
+      providerError || errors[r.status] || "เชื่อมต่อบริการไม่สำเร็จ กรุณาลองอีกครั้ง",
     );
     err.status = r.status;
     throw err;

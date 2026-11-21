@@ -13,10 +13,20 @@ from uuid import uuid4
 
 import sqlalchemy as sa
 
-from .db import MANAGED_REVISION, chunks, documents, engine_for, pdf_files
+from .db import (
+    ROOT,
+    revision,
+    MANAGED_REVISION,
+    chunks,
+    documents,
+    engine_for,
+    pdf_files,
+)
 from .documents import audit, bump_epoch
 from .embedding_api import configured_encoder
-from .ingest import check_space, embed_rows
+from .ingest import check_space, embed_rows, ingest
+from .embedding_api import EmbeddingUnavailable
+from .provider import ProviderCoolingDown
 
 log = logging.getLogger(__name__)
 ERRORS = {
@@ -185,9 +195,24 @@ def work_once(engine, encoder):
 def main():
     logging.basicConfig(level=logging.INFO)
     engine = engine_for()
-    encoder = configured_encoder()
+    encoder = configured_encoder(engine)
     try:
         while True:
+            if os.getenv("EMBEDDING_MODE") == "managed":
+                if encoder.space == "setup-required":
+                    time.sleep(2)
+                    continue
+                with engine.connect() as conn:
+                    ready = revision(conn)
+                if not ready:
+                    try:
+                        ingest(engine, encoder, ROOT / "data/catalog.json")
+                    except (EmbeddingUnavailable, ProviderCoolingDown):
+                        log.warning(
+                            "catalog_embedding_unavailable; retrying in 30 seconds"
+                        )
+                        time.sleep(30)
+                    continue
             if not work_once(engine, encoder):
                 time.sleep(2)
     finally:

@@ -24,6 +24,7 @@ from .db import (
     turns,
 )
 from .security import INJECTION, OFF_TOPIC, normalize, redact
+from .provider_profiles import active_profile
 from .response_policy import POLICY_REF, POLICY_URL
 from .workspace import case_clearance
 
@@ -113,6 +114,8 @@ def reserve(engine, user, chat_id, body):
     fingerprint = hashlib.sha256(body.question.encode()).hexdigest()
     with engine.begin() as c:
         rev = revision(c)
+        if not rev:
+            raise HTTPException(503, "กรุณาตั้งค่า embeddings และรอจัดทำดัชนี")
         if not rev:
             raise HTTPException(503, "ดัชนียังไม่พร้อม")
         lease = uuid4().hex
@@ -376,6 +379,7 @@ def install_agent(app, current, answer):
         service = app.state.service
         with service.engine.connect() as c:
             rev = revision(c)
+            profile = active_profile(c, "chat")
             rows = c.execute(
                 sa.select(events.c.status, events.c.reason, sa.func.count())
                 .where(events.c.ts >= time.time() - 86400)
@@ -399,9 +403,13 @@ def install_agent(app, current, answer):
         for status, _, n in rows:
             totals[status] += n
         return dict(
-            model=service.generator.model,
-            model_revision=getattr(service.generator, "version", ""),
-            protocol=getattr(service.generator, "protocol", ""),
+            model=profile["model"] if profile else service.generator.model,
+            model_revision=str(profile["version"])
+            if profile
+            else getattr(service.generator, "version", ""),
+            protocol=profile["provider"]
+            if profile
+            else getattr(service.generator, "protocol", ""),
             threshold=service.threshold,
             revision=rev,
             counts=totals,

@@ -56,7 +56,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python scripts/configure.py
+      - run: |
+          mkdir -p "$CAPACITY_STATE_DIR"
+          echo "CAPACITY_UID_GID=$(id -u):$(id -g)" >> "$GITHUB_ENV"
+          python scripts/configure.py
       - run: python -m pip install 'httpx==0.28.1'
       - run: docker compose up -d --build --wait api
       - name: Check all inference goes through HTTP

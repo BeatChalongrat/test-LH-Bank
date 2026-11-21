@@ -8,18 +8,22 @@ from functools import partial
 import anyio
 import sqlalchemy as sa
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from .ingest import check_space
+from .provider_admin import install_providers
 from .agent import install_agent
 from .db import ROOT, engine_for, events, revision, tickets
 from .documents import install_documents
 from .embedding_api import configured_encoder
 from .security import authenticate
-from .service import Evidence, Generator, Service
+from .service import Evidence, Generator, Service, IndexNotReady
 from .web_auth import install_browser_auth
 from .workspace import install_workspace
 
@@ -49,12 +53,15 @@ def create_app(service=None):
     @asynccontextmanager
     async def lifespan(app):
         managed = service is None
-        app.state.service = service or Service(
-            engine_for(), configured_encoder(), Generator()
-        )
         if managed:
-            with app.state.service.engine.connect() as conn:
-                check_space(conn, app.state.service.encoder)
+            engine = engine_for()
+            encoder = configured_encoder(engine)
+            app.state.service = Service(engine, encoder, Generator())
+            if getattr(encoder, "space", "") != "setup-required":
+                with engine.connect() as conn:
+                    check_space(conn, encoder)
+        else:
+            app.state.service = service
         in_flight = int(os.getenv("INFERENCE_IN_FLIGHT", "16"))
         if not 1 <= in_flight <= 256:
             raise ValueError("INFERENCE_IN_FLIGHT must be 1–256")
@@ -84,6 +91,13 @@ def create_app(service=None):
     app = FastAPI(
         title="Enterprise Knowledge & Support", version="1.0.0", lifespan=lifespan
     )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_errors(request, exc):
+        if request.url.path.startswith("/api/admin/provider"):
+            return JSONResponse({"detail": "กรุณาตรวจสอบข้อมูลโปรไฟล์"}, status_code=422)
+        return await request_validation_exception_handler(request, exc)
+
     bearer = HTTPBearer(auto_error=False)
 
     session_user = install_browser_auth(app)
@@ -135,6 +149,8 @@ def create_app(service=None):
                 rev = revision(conn)
         except sa.exc.SQLAlchemyError:
             rev = None
+        if not rev and os.getenv("EMBEDDING_MODE") == "managed":
+            return {"status": "setup_required", "revision": None}
         if not rev:
             raise HTTPException(503, "Index unavailable")
         return {"status": "ready", "revision": rev}
@@ -152,7 +168,10 @@ def create_app(service=None):
             if on_commit
             else service.finish
         )
-        request = await anyio.to_thread.run_sync(service.prepare, user, question)
+        try:
+            request = await anyio.to_thread.run_sync(service.prepare, user, question)
+        except IndexNotReady:
+            raise HTTPException(503, "กรุณาตั้งค่า embeddings และรอจัดทำดัชนี") from None
         if not request.needs_inference:
             return await anyio.to_thread.run_sync(finish, user, question, request)
         evidence, lookup_wait = await run_stage(
@@ -177,6 +196,7 @@ def create_app(service=None):
                 service.generate,
                 question,
                 evidence.choices,
+                request.generator,
             )
             overloaded = selected is None
         return await anyio.to_thread.run_sync(
@@ -187,6 +207,7 @@ def create_app(service=None):
     async def ask(body: Question, user=Depends(current)):
         return await answer(user, body.question)
 
+    install_providers(app, current)
     install_agent(app, current, answer)
     install_documents(app, current)
     install_workspace(app, current)

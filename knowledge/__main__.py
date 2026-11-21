@@ -50,15 +50,43 @@ def main():
     sub.add_parser("activate").add_argument("revision")
     sub.add_parser("trace").add_argument("id")
     sub.add_parser("prune")
-    sub.add_parser("reembed")
+    sub.add_parser("reembed").add_argument(
+        "--profile",
+        help="saved embedding profile ID to activate atomically during maintenance",
+    )
     args = p.parse_args()
     engine = engine_for()
     if args.action not in {"issue-invite", "revoke-sessions"}:
         initialize(engine)
     if args.action == "reembed":
-        print(json.dumps(reembed(engine, configured_encoder())))
+        if args.profile:
+            from .db import provider_profiles
+            from .embedding_api import ApiEncoder
+
+            with engine.connect() as conn:
+                row = (
+                    conn.execute(
+                        sa.select(provider_profiles).where(
+                            provider_profiles.c.id == args.profile,
+                            provider_profiles.c.purpose == "embedding",
+                        )
+                    )
+                    .mappings()
+                    .one()
+                )
+            encoder = ApiEncoder(row)
+        else:
+            encoder = configured_encoder(engine)
+        print(json.dumps(reembed(engine, encoder, args.profile)))
     elif args.action in {"bootstrap", "ingest"}:
-        print(json.dumps(ingest(engine, configured_encoder(), args.catalog)))
+        encoder = configured_encoder(engine)
+        if (
+            args.action == "bootstrap"
+            and getattr(encoder, "space", "") == "setup-required"
+        ):
+            print("Select the embedding provider in Admin to index the catalog")
+        else:
+            print(json.dumps(ingest(engine, encoder, args.catalog)))
         if (
             args.action == "bootstrap"
             and args.with_test_accounts

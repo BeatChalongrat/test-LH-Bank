@@ -41,6 +41,29 @@ sessions = sa.Table(
 settings = sa.Table(
     "settings", meta, C("name", T, primary_key=True), C("value", T, nullable=False)
 )
+provider_profiles = sa.Table(
+    "model_provider_profiles",
+    meta,
+    C("id", T, primary_key=True),
+    C("name", T, nullable=False),
+    C("purpose", T, nullable=False),
+    C("provider", T, nullable=False),
+    C("endpoint", T, nullable=False),
+    C("model", T, nullable=False),
+    C("secret", T, nullable=False),
+    C("version", sa.Integer, nullable=False),
+    C("actor", T, nullable=False),
+    C("updated", sa.Float, nullable=False),
+)
+provider_routes = sa.Table(
+    "model_provider_routes",
+    meta,
+    C("purpose", T, primary_key=True),
+    C("profile_id", T, sa.ForeignKey("model_provider_profiles.id")),
+    C("version", sa.Integer, nullable=False),
+    C("actor", T),
+    C("updated", sa.Float),
+)
 pdf_epoch = sa.Table(
     "managed_pdf_epoch",
     meta,
@@ -311,6 +334,12 @@ def initialize(engine):
             .values(name="case_status", enabled=True, version=1)
             .on_conflict_do_nothing(index_elements=["name"])
         )
+        for purpose in ("chat", "embedding"):
+            conn.execute(
+                insert_for(conn, provider_routes)
+                .values(purpose=purpose, version=1)
+                .on_conflict_do_nothing(index_elements=["purpose"])
+            )
         # create_all skips indexes on pre-existing tables when upgrading a live installation.
         ticket_queue_index.create(conn, checkfirst=True)
         if engine.dialect.name == "postgresql":
@@ -340,7 +369,16 @@ def initialize(engine):
                     "GRANT SELECT,INSERT ON conversation_turns,tool_changes TO desk_web"
                 )
             )
-            conn.execute(sa.text("GRANT SELECT,UPDATE ON tool_controls TO desk_web"))
+            conn.execute(
+                sa.text(
+                    "GRANT SELECT,UPDATE ON tool_controls,model_provider_routes TO desk_web"
+                )
+            )
+            conn.execute(
+                sa.text(
+                    "GRANT SELECT,INSERT,UPDATE,DELETE ON model_provider_profiles TO desk_web"
+                )
+            )
             conn.execute(sa.text("GRANT SELECT,DELETE ON login_invites TO desk_web"))
             conn.execute(
                 sa.text("GRANT SELECT,INSERT,DELETE ON web_sessions TO desk_web")

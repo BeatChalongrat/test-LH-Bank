@@ -40,6 +40,8 @@ jobs:
       - name: Run selected load profile on a separate database
         if: inputs.load != 'quality-only'
         run: |
+          mkdir -p "$CAPACITY_STATE_DIR"
+          export CAPACITY_UID_GID="$(id -u):$(id -g)"
           python -m pip install 'httpx==0.28.1'
           docker compose -p "$CAPACITY_PROJECT" -f compose.yaml -f evaluation/capacity.compose.yaml -f deploy/compose.provider.yaml -f evaluation/provider-capacity.compose.yaml up -d --wait api
           case "$LOAD_PROFILE" in

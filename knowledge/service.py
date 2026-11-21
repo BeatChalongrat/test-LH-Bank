@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import time
+import threading
 import uuid
 from dataclasses import dataclass
 
@@ -12,6 +13,8 @@ import sqlalchemy as sa
 from .db import (
     MANAGED_REVISION,
     LOCAL_EMBEDDING_SPACE,
+    provider_profiles,
+    provider_routes,
     cache,
     case_documents,
     documents,
@@ -24,6 +27,7 @@ from .db import (
     tickets,
 )
 from .embedding_api import EmbeddingUnavailable
+from .provider_profiles import allowed_profile, key_for, ProfileConfigurationError
 from .provider import ProviderBackoff, ProviderCoolingDown
 from .response_policy import POLICY_REF, POLICY_URL
 from .reader import COMPLEX, FACT, Reader
@@ -59,16 +63,29 @@ class Evidence:
 
 
 class Generator:
-    def __init__(self):
+    def __init__(self, profile=None, client=None):
         self.url = os.getenv("LLM_BASE_URL", "http://127.0.0.1:18765/v1").rstrip("/")
         self.model = os.getenv("LLM_MODEL", "knowledge-local")
         self.version = os.getenv("LLM_REVISION", "qwen2.5-1.5b-q4_k_m-91cad511")
         self.protocol = os.getenv("LLM_PROTOCOL", "auto")
+        self.key = os.getenv("LLM_API_KEY", "")
+        if profile is not None:
+            if not allowed_profile(profile) or profile["purpose"] != "chat":
+                raise ProfileConfigurationError("Provider endpoint is unavailable")
+            self.url, self.model, self.key = (
+                profile["endpoint"],
+                profile["model"],
+                key_for(profile),
+            )
+            self.version = f'{profile["id"]}.{profile["version"]}'
+            self.protocol = (
+                "anthropic" if profile["provider"] == "anthropic" else "openai"
+            )
         if self.protocol == "auto":
             self.protocol = "llama" if self.url == "http://llm:8080/v1" else "openai"
-        if self.protocol not in {"llama", "openai"}:
-            raise ValueError("LLM_PROTOCOL must be auto, llama or openai")
-        if self.protocol == "openai":
+        if self.protocol not in {"llama", "openai", "anthropic"}:
+            raise ValueError("LLM_PROTOCOL must be auto, llama, openai or anthropic")
+        if self.protocol != "llama":
             endpoint = httpx.URL(self.url)
             if (
                 not endpoint.host
@@ -76,7 +93,7 @@ class Generator:
                 or endpoint.userinfo
                 or endpoint.query
                 or endpoint.fragment
-                or (os.getenv("LLM_API_KEY") and endpoint.scheme != "https")
+                or (self.key and endpoint.scheme != "https")
             ):
                 raise ValueError(
                     "Invalid chat API endpoint; bearer credentials require HTTPS"
@@ -92,13 +109,15 @@ class Generator:
                 servers.append((extra, int(os.environ["LLAMA_EXTRA_SLOTS"])))
             self.slots = Slots(servers)
         self.backoff = ProviderBackoff()
-        self.client = httpx.Client(
+        self.client = client or httpx.Client(
             timeout=httpx.Timeout(float(os.getenv("LLM_TIMEOUT", "22")), connect=3)
         )
 
     def select(self, question, choices):
+        if self.url == "https://unconfigured.invalid/v1":
+            raise ValueError("No chat provider selected")
         # The model may choose an evidence ID or abstain. Only server-held source text can be returned.
-        if self.protocol == "openai":
+        if self.protocol != "llama":
             self.backoff.check()
         diagnostics = {}
         top = choices[0]
@@ -127,8 +146,8 @@ class Generator:
                 return Selection(1, diagnostics | {"route": "extractive"})
         labels = [r["ref"] for r in choices]
         headers = {}
-        if key := os.getenv("LLM_API_KEY"):
-            headers["Authorization"] = "Bearer " + key
+        if self.key:
+            headers["Authorization"] = "Bearer " + self.key
         if self.protocol == "llama":
             # Stable evidence order lets llama.cpp reuse KV prefixes across related queries.
             # All candidates came from this user's ACL-filtered retrieval.
@@ -193,11 +212,27 @@ class Generator:
                     },
                 ],
             }
+        if self.protocol == "anthropic":
+            headers = {"x-api-key": self.key, "anthropic-version": "2023-06-01"}
+            payload = {
+                "max_tokens": 128,
+                "system": EVIDENCE_INSTRUCTION,
+                "messages": [payload["messages"][-1]],
+                "tools": [
+                    {
+                        "name": "choose_evidence",
+                        "description": "Select one authorized evidence ID or NONE.",
+                        "input_schema": schema,
+                    }
+                ],
+                "tool_choice": {"type": "tool", "name": "choose_evidence"},
+            }
         payload["model"] = self.model
         endpoint = (
             self.url.removesuffix("/v1") + "/completion"
             if self.protocol == "llama"
-            else self.url + "/chat/completions"
+            else self.url
+            + ("/messages" if self.protocol == "anthropic" else "/chat/completions")
         )
         posted = time.perf_counter()
         if self.slots:
@@ -216,7 +251,7 @@ class Generator:
         else:
             res = self.client.post(endpoint, headers=headers, json=payload)
         diagnostics["llm_http_ms"] = round((time.perf_counter() - posted) * 1000, 2)
-        if self.protocol == "openai":
+        if self.protocol != "llama":
             self.backoff.observe(res)
         res.raise_for_status()
         body = res.json()
@@ -251,7 +286,25 @@ class Generator:
             ):
                 if isinstance(usage.get(field), int):
                     timings[span] = usage[field]
-            value = json.loads(body["choices"][0]["message"]["content"])["choice"]
+            if self.protocol == "anthropic":
+                calls = [
+                    c
+                    for c in body["content"]
+                    if isinstance(c, dict)
+                    and c.get("type") == "tool_use"
+                    and c.get("name") == "choose_evidence"
+                ]
+                if len(calls) != 1:
+                    raise ValueError("Expected one evidence choice")
+                value = calls[0]["input"]["choice"]
+                for field, span in (
+                    ("input_tokens", "prompt_n"),
+                    ("output_tokens", "predicted_n"),
+                ):
+                    if isinstance(usage.get(field), int):
+                        timings[span] = usage[field]
+            else:
+                value = json.loads(body["choices"][0]["message"]["content"])["choice"]
         if value != "NONE" and value not in labels:
             raise ValueError("Invalid evidence selection")
         return Selection(
@@ -302,28 +355,65 @@ class Prepared:
     saved: dict | None
     refusal: str | None
 
+    generator: object
+
     @property
     def needs_inference(self):
         return self.saved is None and self.refusal is None
 
 
+class IndexNotReady(Exception):
+    pass
+
+
 class Service:
     def __init__(self, engine, encoder, generator):
         self.engine, self.encoder, self.generator = engine, encoder, generator
+        self.profile_lock = threading.Lock()
+        self.profile_stamp = None
+        self.profile_generator = None
         self.threshold = float(os.getenv("CONFIDENCE_THRESHOLD", "0.42"))
         if not 0 <= self.threshold <= 1:
             raise ValueError("CONFIDENCE_THRESHOLD must be between 0 and 1")
 
+    def generator_for(self, profile):
+        if not profile or not profile["id"]:
+            return self.generator
+        stamp = profile["id"], profile["version"]
+        with self.profile_lock:
+            if self.profile_stamp != stamp:
+                self.profile_generator = Generator(profile, self.generator.client)
+                self.profile_stamp = stamp
+            return self.profile_generator
+
     def prepare(self, user, question):
         start = time.perf_counter()
         q = normalize(question)
-        model_version = getattr(self.generator, "version", self.generator.model)
+        space = getattr(self.encoder, "space", LOCAL_EMBEDDING_SPACE)
         with self.engine.connect() as conn:
-            rev, personalized = conn.execute(
-                sa.select(revision_value(), has_scoped_access(user.subject))
-            ).one()
+            row = (
+                conn.execute(
+                    sa.select(
+                        revision_value().label("rev"),
+                        has_scoped_access(user.subject).label("personalized"),
+                        provider_profiles,
+                    )
+                    .select_from(
+                        provider_routes.outerjoin(
+                            provider_profiles,
+                            provider_profiles.c.id == provider_routes.c.profile_id,
+                        )
+                    )
+                    .where(provider_routes.c.purpose == "chat")
+                )
+                .mappings()
+                .one()
+            )
+            rev, personalized = row["rev"], row["personalized"]
+            generator = self.generator_for(row)
+            model_version = getattr(generator, "version", generator.model)
             if not rev:
-                raise RuntimeError("No published corpus")
+                raise IndexNotReady("No published corpus")
             key = hashlib.sha256(
                 json.dumps(
                     [
@@ -332,12 +422,12 @@ class Service:
                         user.subject if personalized else "",
                         rev,
                         POLICY,
-                        self.generator.model,
+                        generator.model,
                         model_version,
-                        getattr(self.encoder, "space", LOCAL_EMBEDDING_SPACE),
-                        self.generator.url,
-                        getattr(self.generator, "protocol", "openai"),
-                        getattr(self.generator, "routing_revision", "llm-only"),
+                        space,
+                        generator.url,
+                        getattr(generator, "protocol", "openai"),
+                        getattr(generator, "routing_revision", "llm-only"),
                         self.threshold,
                     ],
                     ensure_ascii=False,
@@ -357,7 +447,7 @@ class Service:
                         cache.c.key == key, cache.c.expires > time.time()
                     )
                 )
-        return Prepared(start, q, rev, key, saved, refusal)
+        return Prepared(start, q, rev, key, saved, refusal, generator)
 
     def lookup(self, user, request):
         q, rev = request.q, request.revision
@@ -405,10 +495,10 @@ class Service:
             ]
         return Evidence(score, choices, reason, spans)
 
-    def generate(self, question, choices):
+    def generate(self, question, choices, generator):
         at = time.perf_counter()
         try:
-            result = self.generator.select(question, choices)
+            result = generator.select(question, choices)
         except httpx.HTTPStatusError as exc:
             reason = (
                 "provider_rate_limited"
@@ -429,7 +519,7 @@ class Service:
         request = self.prepare(user, question)
         evidence = self.lookup(user, request) if request.needs_inference else None
         selected = (
-            self.generate(question, evidence.choices)
+            self.generate(question, evidence.choices, request.generator)
             if evidence and evidence.choices
             else None
         )
@@ -450,8 +540,10 @@ class Service:
         start, rev, key = request.start, request.revision, request.key
         trace = uuid.uuid4().hex
         spans = {
-            "model": self.generator.model,
-            "model_revision": getattr(self.generator, "version", self.generator.model),
+            "model": request.generator.model,
+            "model_revision": getattr(
+                request.generator, "version", request.generator.model
+            ),
             "policy": POLICY,
             "threshold": self.threshold,
             "admission_ms": round(queue_ms, 2),

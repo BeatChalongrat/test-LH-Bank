@@ -35,6 +35,8 @@ services:
       DATABASE_URL: postgresql+psycopg://desk_owner:${DB_PASSWORD}@db/knowledge
       STATE_DIR: /state
       MODEL_DIR: /models
+      PROVIDER_ENCRYPTION_KEY: ${PROVIDER_ENCRYPTION_KEY:-}
+      PROVIDER_GATEWAYS: ${PROVIDER_GATEWAYS:-}
       LOCAL_AUTH: ${LOCAL_AUTH:-1}
       LLM_PROTOCOL: ${LLM_PROTOCOL:-auto}
       LLAMA_SLOTS: ${LLAMA_SLOTS:-4}
@@ -57,6 +59,8 @@ services:
       DATABASE_URL: postgresql+psycopg://desk_owner:${DB_PASSWORD}@db/knowledge
       STATE_DIR: /tmp/desk-indexer
       MODEL_DIR: /models
+      PROVIDER_ENCRYPTION_KEY: ${PROVIDER_ENCRYPTION_KEY:-}
+      PROVIDER_GATEWAYS: ${PROVIDER_GATEWAYS:-}
     volumes:
       - ./models:/models:ro
     depends_on:
@@ -73,6 +77,8 @@ services:
       DB_POOL_OVERFLOW: ${DB_POOL_OVERFLOW:-8}
       STATE_DIR: /tmp/desk
       MODEL_DIR: /models
+      PROVIDER_ENCRYPTION_KEY: ${PROVIDER_ENCRYPTION_KEY:-}
+      PROVIDER_GATEWAYS: ${PROVIDER_GATEWAYS:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-http://llm:8080/v1}
       LLAMA_SLOTS: ${LLAMA_SLOTS:-4}
       LLAMA_EXTRA_URL: ${LLAMA_EXTRA_URL:-}
