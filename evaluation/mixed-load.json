@@ -1,0 +1,15 @@
+{
+  "mode": "mixed HTTP; source questions in evaluation/mixed.json",
+  "requests": 30,
+  "target_rps": 2,
+  "elapsed_s": 28.75,
+  "successful": 30,
+  "cache_hits": 18,
+  "cold_p95_ms": 15251.56,
+  "reasons": {
+    "evidence": 30
+  },
+  "p50_ms": 78.26,
+  "p95_ms": 13341.87,
+  "p99_ms": 15251.56
+}

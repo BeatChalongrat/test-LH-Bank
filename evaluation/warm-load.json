@@ -1,0 +1,11 @@
+{
+  "mode": "prewarmed exact-cache HTTP; three Thai questions; one employee; excludes model generation",
+  "requests": 1200,
+  "target_rps": 20,
+  "elapsed_s": 60.12,
+  "successful": 1200,
+  "cache_hits": 1200,
+  "p50_ms": 33.65,
+  "p95_ms": 71.64,
+  "p99_ms": 102.93
+}

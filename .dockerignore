@@ -1,0 +1,7 @@
+.git
+.venv
+var
+models
+tmp
+.env
+__pycache__

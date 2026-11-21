@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>พอร์ทัลพนักงาน</title>
+    <link rel="icon" href="/static/assets/lh-favicon.png" type="image/png" />
+    <link rel="stylesheet" href="/static/app.css" />
+    <script defer src="/static/app.js"></script>
+    <script defer src="/static/directory.js"></script>
+    <script defer src="/static/documents.js"></script>
+    <script defer src="/static/agent.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">ข้ามไปเนื้อหา</a>
+    <aside id="sidebar" aria-label="แถบบริการ">
+      <div class="brand-row">
+        <a class="portal-link" href="#home" aria-label="พอร์ทัลพนักงาน หน้าหลัก"
+          ><img class="wordmark" src="/static/assets/lh-bank.svg" alt="LH Bank" width="132" height="32" /></a
+        >
+        <button id="close-menu" class="quiet" aria-label="ปิดเมนู">
+          <i data-icon="x"></i>
+        </button>
+      </div>
+      <div class="sidebar-scroll">
+        <nav aria-label="เมนูบริการ">
+          <h2 class="nav-label">บริการพนักงาน</h2>
+          <a href="#home" data-view="home" aria-current="page"
+            ><i data-icon="landmark"></i>หน้าหลัก</a
+          >
+          <a href="#library" data-view="library"
+            ><i data-icon="book-open"></i>คลังเอกสาร</a
+          >
+          <a href="#queue" data-view="queue"
+            ><i data-icon="inbox"></i>งานสนับสนุน</a
+          >
+          <a href="#ask" data-view="ask"
+            ><i data-icon="messages-square"></i>แชตผู้ช่วย AI</a
+          >
+          <a href="/admin" id="admin-link" data-view="admin" hidden
+            ><i data-icon="shield-check"></i>ผู้ดูแล AI</a
+          >
+        </nav>
+        <section id="chat-actions" aria-label="จัดการบทสนทนา" hidden>
+          <button id="new-chat" type="button">
+            <i data-icon="new-chat"></i> แชตใหม่
+          </button>
+          <h2 class="nav-label">บทสนทนาล่าสุด</h2>
+          <div id="chat-history"></div>
+        </section>
+      </div>
+      <div class="sidebar-foot">
+        <i data-icon="shield-check"></i>พื้นที่ทำงานภายในองค์กร
+      </div>
+    </aside>
+    <button
+      id="menu-backdrop"
+      aria-label="ปิดเมนูบริการ"
+      tabindex="-1"
+      hidden
+    ></button>
+    <div id="workspace">
+      <header class="mast">
+        <div class="head">
+          <button
+            id="menu-toggle"
+            class="quiet"
+            aria-label="เปิดเมนูบริการ"
+            aria-expanded="false"
+            aria-controls="sidebar"
+          >
+            <i data-icon="menu"></i>
+          </button>
+          <a class="mobile-brand" href="#home" aria-label="พอร์ทัลพนักงาน หน้าหลัก"><img src="/static/assets/lh-bank.svg" width="99" height="24" alt="LH Bank" /></a>
+          <div class="current-location">
+            <span>พอร์ทัลพนักงาน</span><i data-icon="chevron-right"></i
+            ><strong id="current-view">หน้าหลัก</strong>
+          </div>
+          <button id="account" class="account">
+            <i data-icon="user-round"></i><span id="identity">เข้าสู่ระบบ</span><i data-icon="chevron-down"></i>
+          </button>
+        </div>
+      </header>
+      <main id="main" class="wrap" tabindex="-1">
+        <section id="home">
+          <div class="hero" id="home-hero">
+            <div class="hero-photo" role="presentation"></div>
+            <div class="hero-body">
+              <p class="hero-label" lang="en">Employee Workspace</p>
+              <h1>ศูนย์บริการ<span>พนักงาน</span></h1>
+              <p>
+                ค้นระเบียบและขั้นตอนการทำงาน<br />
+                ถามผู้ช่วย AI หรือติดตามเรื่องที่ส่งให้เจ้าหน้าที่
+              </p>
+              <div class="hero-actions"><a class="primary" href="#ask"
+                ><i data-icon="messages-square"></i>เปิดแชตผู้ช่วย AI</a
+              ><a class="outline" href="#library"><i data-icon="folder-open"></i>ค้นเอกสาร</a></div>
+            </div>
+          </div>
+          <div class="columns">
+            <div>
+              <section class="block">
+                <h2>ค้นตามหัวข้อ</h2>
+                <div class="topics">
+                  <button data-topic="เบิก">
+                    <i data-icon="banknote" class="icon-box blue"></i
+                    ><span>การเบิกค่าใช้จ่าย</span
+                    ><i data-icon="chevron-right"></i>
+                  </button>
+                  <button data-topic="ลา">
+                    <i data-icon="calendar-days" class="icon-box violet"></i
+                    ><span>ลาและวันหยุด</span
+                    ><i data-icon="chevron-right"></i>
+                  </button>
+                  <button data-topic="chat">
+                    <i data-icon="messages-square" class="icon-box orange"></i
+                    ><span>เคสบริการ</span><i data-icon="chevron-right"></i>
+                  </button>
+                </div>
+              </section>
+              <section class="block">
+                <div class="section-head">
+                  <h2>นโยบายและขั้นตอน</h2>
+                  <a class="text-link" href="#library">ดูคลังเอกสาร</a>
+                </div>
+                <div id="home-docs" class="doc-list"></div>
+              </section>
+            </div>
+            <section class="support block">
+              <div class="section-head">
+                <i class="tint" data-icon="headphones"></i>
+                <h2>ติดตามงานสนับสนุน</h2>
+              </div>
+              <p class="muted" id="support-hint">
+                สถานะคำถามที่ส่งให้เจ้าหน้าที่ตรวจสอบ
+              </p>
+              <div id="case-summary"></div>
+              <a id="queue-link" href="#queue" class="outline">เปิดรายการงาน</a>
+            </section>
+          </div>
+        </section>
+        <section id="ask" class="chat-page" aria-label="แชตผู้ช่วย AI" hidden>
+          <div class="chat-stage">
+            <div id="chat-intro">
+              <span class="assistant-mark" aria-hidden="true"
+                ><i data-icon="messages-square"></i
+              ></span>
+              <p id="greeting">ผู้ช่วย AI</p>
+              <h1>วันนี้ให้ช่วยเรื่องอะไร?</h1>
+            </div>
+            <div
+              id="result"
+              role="log"
+              aria-live="polite"
+              aria-label="ข้อความในบทสนทนา"
+            ></div>
+            <div class="composer-area">
+              <form id="query" class="searchbar">
+                <label class="sr" for="question">ถามผู้ช่วย AI</label>
+                <input
+                  id="question"
+                  maxlength="1200"
+                  minlength="2"
+                  required
+                  placeholder="พิมพ์คำถามเกี่ยวกับงาน…"
+                  autocomplete="off"
+                />
+                <button
+                  class="primary"
+                  id="submitq"
+                  aria-label="ส่งข้อความ"
+                  title="ส่งข้อความ"
+                >
+                  <i data-icon="send"></i>
+                </button>
+              </form>
+              <div class="prompts" aria-label="คำถามที่ใช้บ่อย">
+                <button
+                  type="button"
+                  data-prompt="ลาพักร้อนต้องยื่นล่วงหน้ากี่วัน"
+                >
+                  <i data-icon="calendar-days"></i>ขั้นตอนลาพักร้อน
+                </button>
+                <button
+                  type="button"
+                  data-prompt="ค่าแท็กซี่เบิกได้สูงสุดกี่บาทต่อเที่ยว"
+                >
+                  <i data-icon="banknote"></i>เบิกค่าเดินทาง
+                </button>
+                <button id="ask-cases" type="button" data-prompt="ดูเคสของฉัน">
+                  <i data-icon="inbox"></i>ดูเคสของฉัน
+                </button>
+              </div>
+              <p id="chat-progress" role="status"></p>
+            </div>
+          </div>
+        </section>
+        <section id="library" class="subpage" hidden>
+          <div class="page-heading">
+          <h1>คลังเอกสาร</h1>
+          <p class="lead">ค้นจากชื่อเอกสาร เนื้อหา หรือหน่วยงานเจ้าของเรื่อง</p>
+          </div>
+          <form id="library-filter" class="filter-bar">
+            <label class="searchfield"
+              ><i data-icon="search"></i
+              ><input
+                id="doc-q"
+                type="search"
+                maxlength="160"
+                placeholder="ค้นเอกสาร"
+                aria-label="ค้นเอกสาร"
+            /></label>
+            <select id="doc-kind" aria-label="ประเภทเอกสาร">
+              <option value="">ทุกประเภท</option>
+              <option value="policy">นโยบายและขั้นตอน</option>
+              <option value="chat">บันทึกเคสบริการ</option></select
+            ><button class="primary">ค้นหา</button>
+          </form>
+          <div id="documents" class="doc-list" aria-live="polite"></div>
+        </section>
+        <section id="queue" class="subpage" hidden>
+          <div class="page-heading">
+          <h1>งานสนับสนุน</h1>
+          <p class="lead" id="queue-description">
+            ติดตามการรับเรื่องและคำตอบจากเจ้าหน้าที่
+          </p>
+          </div>
+          <div class="filter-bar">
+            <label for="case-state">สถานะงาน</label>
+            <select id="case-state">
+              <option value="">ทุกสถานะ</option>
+              <option value="open">รอรับเรื่อง</option>
+              <option value="in_progress">กำลังดำเนินการ</option>
+              <option value="resolved">ปิดรายการแล้ว</option>
+            </select>
+            <button id="refresh" class="outline">
+              <i data-icon="refresh-cw"></i>รีเฟรช
+            </button>
+          </div>
+          <div id="tickets" aria-live="polite"></div>
+        </section>
+        <section id="admin" class="subpage" hidden>
+          <div class="section-head page-heading">
+            <h1>ผู้ดูแลระบบ AI</h1>
+            <button id="admin-refresh" class="outline"><i data-icon="refresh-cw"></i>รีเฟรช</button>
+          </div>
+          <section id="admin-documents" class="admin-card" hidden>
+            <div class="section-head">
+              <h2>เอกสารสำหรับผู้ช่วย AI</h2>
+              <button id="open-departments" class="outline" type="button">
+                <i data-icon="team"></i>จัดการแผนก
+              </button>
+              <button id="document-refresh" class="outline" type="button">
+                <i data-icon="refresh-cw"></i>รีเฟรชเอกสาร
+              </button>
+            </div>
+            <div class="document-admin-grid">
+              <form id="pdf-upload">
+                <h3>อัปโหลดเอกสาร</h3>
+                <div class="file-picker">
+                  <label for="pdf-file"><i data-icon="upload"></i>เลือกไฟล์จากเครื่อง</label>
+                  <output id="selected-file" for="pdf-file">ยังไม่ได้เลือกไฟล์</output>
+                <input
+                  type="file"
+                  id="pdf-file"
+                  accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.csv"
+                  required
+                  aria-describedby="pdf-limits"
+                />
+                </div>
+                <p id="pdf-limits" class="meta">
+                  PDF, Word, Excel, PowerPoint, TXT, Markdown และ CSV สูงสุด 15
+                  MB · PDF ไม่เกิน 80 หน้า
+                </p>
+                <label for="pdf-title">ชื่อเอกสาร</label>
+                <input id="pdf-title" required minlength="2" maxlength="160" />
+                <label for="pdf-owner">หน่วยงานเจ้าของเอกสาร</label>
+                <input id="pdf-owner" required minlength="2" maxlength="100" />
+                <fieldset class="role-options">
+                  <legend>สิทธิ์ตามบทบาท</legend>
+                </fieldset>
+                <div class="scoped-readers"></div>
+                <button class="primary" type="submit">
+                  <i data-icon="upload"></i>อัปโหลดและจัดทำดัชนี
+                </button>
+                <p id="upload-status" role="status" class="meta"></p>
+              </form>
+              <div>
+                <h3>เอกสารที่อัปโหลด</h3>
+                <div id="managed-list" aria-live="polite"></div>
+                <div class="document-pages" aria-label="หน้าเอกสาร">
+                  <button
+                    id="documents-prev"
+                    class="outline"
+                    type="button"
+                    hidden
+                  >
+                    หน้าก่อน
+                  </button>
+                  <button
+                    id="documents-next"
+                    class="outline"
+                    type="button"
+                    hidden
+                  >
+                    หน้าถัดไป
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+          <div id="admin-content" aria-live="polite"></div>
+        </section>
+        <p id="error" role="alert"></p>
+      </main>
+    </div>
+    <dialog id="access-dialog" aria-labelledby="access-title">
+      <div class="dialog-head">
+        <i class="icon-box blue" data-icon="shield-check"></i>
+        <button type="button" class="quiet close" aria-label="ปิด">
+          <i data-icon="x"></i>
+        </button>
+      </div>
+      <h2 id="access-title">แก้ไขสิทธิ์เอกสาร</h2>
+      <p id="access-document" class="meta"></p>
+      <form id="document-access">
+        <fieldset class="role-options">
+          <legend>สิทธิ์ตามบทบาท</legend>
+        </fieldset>
+        <div class="scoped-readers"></div>
+        <label
+          ><input type="checkbox" id="pdf-enabled" />
+          เปิดให้ค้นจากแชตและคลังเอกสาร</label
+        >
+        <button class="primary" type="submit">บันทึกสิทธิ์</button>
+        <p id="access-status" role="status" class="meta"></p>
+      </form>
+    </dialog>
+    <dialog id="departments-dialog" aria-labelledby="departments-title">
+      <div class="dialog-head">
+        <i class="icon-box blue" data-icon="briefcase-business"></i>
+        <button type="button" class="quiet close" aria-label="ปิด">
+          <i data-icon="x"></i>
+        </button>
+      </div>
+      <h2 id="departments-title">จัดการแผนก</h2>
+      <form id="department-create">
+        <label for="department-code">รหัสแผนก</label>
+        <input id="department-code" placeholder="HR" maxlength="24" required />
+        <label for="department-name">ชื่อแผนก</label>
+        <input
+          id="department-name"
+          placeholder="ฝ่ายทรัพยากรบุคคล"
+          maxlength="80"
+          required
+        />
+        <button class="primary" type="submit">เพิ่มแผนก</button>
+      </form>
+      <div class="department-members-wrap">
+        <label for="membership-department">สมาชิกแผนก</label>
+        <select id="membership-department"></select>
+        <label for="membership-query">ค้นหาบัญชีพนักงาน</label>
+        <div class="identity-search">
+          <input type="search" id="membership-query" maxlength="260" /><button
+            id="membership-find"
+            class="outline"
+            type="button"
+          >
+            ค้นหา
+          </button>
+        </div>
+        <div id="memberships" aria-live="polite"></div>
+      </div>
+      <p id="department-status" role="status"></p>
+    </dialog>
+    <dialog id="auth-dialog">
+      <div class="dialog-head">
+        <i class="icon-box blue" data-icon="lock-keyhole"></i
+        ><button type="button" class="quiet close" aria-label="ปิด">
+          <i data-icon="x"></i>
+        </button>
+      </div>
+      <h2 id="auth-title">เข้าสู่พื้นที่ทำงาน</h2>
+      <p id="auth-note" class="muted"></p>
+      <a id="sso" hidden class="primary" href="/auth/login"
+        >เข้าสู่ระบบด้วยบัญชีองค์กร</a
+      >
+      <form id="invite-form" hidden>
+        <label for="invite">รหัสเชิญจากผู้ดูแล</label
+        ><input
+          id="invite"
+          type="password"
+          autocomplete="one-time-code"
+          maxlength="128"
+          required
+        /><button class="primary">เข้าสู่พื้นที่ทำงาน</button>
+      </form>
+      <p id="login-error" role="alert"></p>
+      <button hidden id="logout" class="outline">ออกจากระบบ</button>
+    </dialog>
+    <dialog id="doc-dialog">
+      <div class="dialog-head">
+        <i class="icon-box blue" data-icon="file-text"></i
+        ><button class="quiet close" aria-label="ปิด">
+          <i data-icon="x"></i>
+        </button>
+      </div>
+      <div id="doc-detail"></div>
+    </dialog>
+  </body>
+</html>

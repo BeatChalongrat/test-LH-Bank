@@ -1,0 +1,15 @@
+{
+  "endpoint": "new_conversation_message",
+  "requests": 5000,
+  "distinct_subjects": 5000,
+  "target_rps": 18,
+  "observed_window": "first 5000 scheduled requests of interrupted diagnostic run",
+  "all": {
+    "p50_ms": 3643.39,
+    "p95_ms": 14411.87,
+    "p99_ms": 18585.91
+  },
+  "verified_responses": 3132,
+  "actual_cache_hits": 3000,
+  "trace_log_sha256": "ad9fe5a18dc3df60b30a515a1516b0832a8ca3d8b24c6357036ecc154958aa80"
+}

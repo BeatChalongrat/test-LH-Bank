@@ -1,0 +1,92 @@
+{
+  "corpus": "8 mock documents; one organization; role-scoped retrieval",
+  "profile": "open-loop, seeded randomized 60% hot / 40% unique substantive scenario variants",
+  "target_rps": 2.0,
+  "requests": 180,
+  "responses": 180,
+  "elapsed_s": 91.747,
+  "completed_rps": 1.96,
+  "distinct_subjects": 180,
+  "unique_cold_questions": 72,
+  "actual_cache_hits": 108,
+  "cache_mix_mismatches": 0,
+  "verified_responses": 180,
+  "verified_within_3s": 176,
+  "http_codes": {
+    "200": 180
+  },
+  "reasons": {
+    "evidence": 180
+  },
+  "all": {
+    "p50_ms": 114.6,
+    "p95_ms": 2199.71,
+    "p99_ms": 4047.14
+  },
+  "cold": {
+    "p50_ms": 572.11,
+    "p95_ms": 3606.93,
+    "p99_ms": 5418.78
+  },
+  "warm": {
+    "p50_ms": 81.54,
+    "p95_ms": 140.0,
+    "p99_ms": 204.73
+  },
+  "traces_joined": 180,
+  "generation_calls": 72,
+  "decision_routes": {
+    "extractive": 31,
+    "llm": 41
+  },
+  "replica_completions": {
+    "0": 41
+  },
+  "server_admission": {
+    "p50_ms": 0.2,
+    "p95_ms": 1.19,
+    "p99_ms": 5.69
+  },
+  "reader_inference": {
+    "p50_ms": 86.94,
+    "p95_ms": 182.33,
+    "p99_ms": 303.23
+  },
+  "llm_http": {
+    "p50_ms": 1156.81,
+    "p95_ms": 3639.62,
+    "p99_ms": 5081.04
+  },
+  "launch_lag": {
+    "p50_ms": 9.12,
+    "p95_ms": 21.18,
+    "p99_ms": 23.92
+  },
+  "retrieval": {
+    "p50_ms": 31.66,
+    "p95_ms": 69.35,
+    "p99_ms": 100.06
+  },
+  "model_roundtrip": {
+    "p50_ms": 334.88,
+    "p95_ms": 3489.09,
+    "p99_ms": 5195.94
+  },
+  "queue_and_transport_estimate": {
+    "p50_ms": 14.24,
+    "p95_ms": 1338.27,
+    "p99_ms": 1781.91
+  },
+  "prompt_compute": {
+    "p50_ms": 880.39,
+    "p95_ms": 3155.75,
+    "p99_ms": 3517.03
+  },
+  "tokens_evaluated": {
+    "prompt": 1673,
+    "output": 77
+  },
+  "trace_log_sha256": "e0ca2aea6e8ea92c0af191afdda83c3842017bb07a5c3d4d975932753796ac09",
+  "worst_minute_p95_ms": 2794.81,
+  "passed": false
+}

@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.pdf binary
+*.jsonl.gz binary
+*.ttf binary
+*.webp binary
+*.cmd text eol=crlf

@@ -1,0 +1,10 @@
+[
+  {"id":"FIN-01","title":"เบิกค่าเดินทางในประเทศ","file":"travel.pdf","type":"policy","owner":"ฝ่ายการเงิน","audience":"staff","version":"2.1","tags":"เบิกเงิน เบิกค่าเดินทาง ค่าแท็กซี่ รถรับจ้าง taxi reimbursement ใบเสร็จ กำหนดส่ง วงเงิน"},
+  {"id":"HR-01","title":"การขอลาพักร้อน","file":"leave.pdf","type":"policy","owner":"ฝ่ายบุคคล","audience":"staff","version":"3.0","tags":"ลาพักร้อน ลาพักผ่อน ลาหยุด วันลา ขออนุมัติ หัวหน้า annual leave แจ้งล่วงหน้า"},
+  {"id":"HR-02","title":"การแจ้งลาป่วย","file":"sick.txt","type":"policy","owner":"ฝ่ายบุคคล","audience":"staff","version":"1.3","tags":"ลาป่วย ใบรับรองแพทย์ ไม่สบาย แจ้งหัวหน้า sick leave"},
+  {"id":"FIN-02","title":"การเบิกเมื่อใบเสร็จสูญหาย","file":"receipt.txt","type":"policy","owner":"ฝ่ายการเงิน","audience":"staff","version":"1.1","tags":"ใบเสร็จหาย บิลหาย เอกสารหาย หลักฐานแทนใบเสร็จ lost receipt"},
+  {"id":"EX-01","title":"รอบทบทวนเงินเดือนผู้บริหาร","file":"compensation.txt","type":"policy","owner":"คณะกรรมการค่าตอบแทน","audience":"executive","version":"1.0","tags":"รอบทบทวนเงินเดือนผู้บริหาร executive salary review ค่าตอบแทน"},
+  {"id":"CHAT-01","title":"บทสนทนาเคส CS-1042","file":"case-1042.txt","type":"chat","owner":"ศูนย์บริการ","audience":"staff","version":"1","tags":"CS-1042 สถานะ ส่งเอกสารซ้ำ"},
+  {"id":"CHAT-02","title":"บทสนทนาเคส HR-709","file":"case-709.txt","type":"chat","owner":"ฝ่ายบุคคล","audience":"staff","version":"1","tags":"HR-709 แชต ลาพักร้อน"},
+  {"id":"CHAT-03","title":"บทสนทนาเคส FIN-305","file":"case-305.txt","type":"chat","owner":"ฝ่ายการเงิน","audience":"staff","version":"1","tags":"FIN-305 แชต ค่าแท็กซี่"}
+]

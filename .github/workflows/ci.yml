@@ -1,0 +1,39 @@
+name: Service regression checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - uses: actions/cache@v4
+        with:
+          path: models
+          key: e5-${{ hashFiles('scripts/models.py') }}
+      - run: python scripts/models.py
+      - run: python -m pytest -q
+  hr-acceptance:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: models
+          key: full-models-${{ hashFiles('scripts/models.py') }}
+      - run: python scripts/configure.py
+      - run: python scripts/models.py --llm
+      - run: docker compose up -d --build --wait api indexer
+      - run: python scripts/hr_demo.py setup
+      - run: python scripts/hr_demo.py setup
+      - run: python scripts/hr_demo.py verify

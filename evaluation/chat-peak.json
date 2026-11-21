@@ -1,0 +1,96 @@
+{
+  "corpus": "8 mock documents; one organization; role-scoped retrieval",
+  "profile": "open-loop, seeded randomized 60% hot / 40% unique substantive scenario variants",
+  "endpoint": "new_conversation_message",
+  "target_rps": 18.0,
+  "requests": 5000,
+  "responses": 5000,
+  "elapsed_s": 289.599,
+  "completed_rps": 17.27,
+  "distinct_subjects": 5000,
+  "unique_cold_questions": 2000,
+  "actual_cache_hits": 3000,
+  "cache_mix_mismatches": 0,
+  "verified_responses": 3123,
+  "verified_within_3s": 2216,
+  "http_codes": {
+    "200": 5000
+  },
+  "reasons": {
+    "evidence": 3123,
+    "inference_overloaded": 1874,
+    "generator_unavailable": 3
+  },
+  "all": {
+    "p50_ms": 6028.55,
+    "p95_ms": 16868.39,
+    "p99_ms": 23383.14
+  },
+  "cold": {
+    "p50_ms": 8234.82,
+    "p95_ms": 21342.02,
+    "p99_ms": 24655.44
+  },
+  "warm": {
+    "p50_ms": 122.14,
+    "p95_ms": 14628.97,
+    "p99_ms": 17313.83
+  },
+  "traces_joined": 5000,
+  "generation_calls": 126,
+  "decision_routes": {
+    "extractive": 58,
+    "llm": 65,
+    "unsuccessful": 3
+  },
+  "replica_completions": {
+    "0": 65
+  },
+  "server_admission": {
+    "p50_ms": 8001.36,
+    "p95_ms": 8293.91,
+    "p99_ms": 8834.35
+  },
+  "reader_inference": {
+    "p50_ms": 114.66,
+    "p95_ms": 238.49,
+    "p99_ms": 258.19
+  },
+  "llm_http": {
+    "p50_ms": 5118.92,
+    "p95_ms": 14118.98,
+    "p99_ms": 20748.24
+  },
+  "launch_lag": {
+    "p50_ms": 3.4,
+    "p95_ms": 20.11,
+    "p99_ms": 25.93
+  },
+  "retrieval": {
+    "p50_ms": 291.6,
+    "p95_ms": 910.81,
+    "p99_ms": 1570.06
+  },
+  "model_roundtrip": {
+    "p50_ms": 615.13,
+    "p95_ms": 14288.58,
+    "p99_ms": 22187.51
+  },
+  "queue_and_transport_estimate": {
+    "p50_ms": 2702.9,
+    "p95_ms": 12045.11,
+    "p99_ms": 17183.54
+  },
+  "prompt_compute": {
+    "p50_ms": 1568.0,
+    "p95_ms": 3819.72,
+    "p99_ms": 5170.13
+  },
+  "tokens_evaluated": {
+    "prompt": 3203,
+    "output": 119
+  },
+  "trace_log_sha256": "eb0f9f8d08a11477bbe7f122fcd108875424387303bfd6bdebfe4e3d5c1c5ec7",
+  "worst_minute_p95_ms": 23922.02,
+  "passed": false
+}

@@ -1,0 +1,21 @@
+# Run behind the organization's HTTPS ingress on the same host or private network.
+services:
+  seed:
+    volumes:
+      - ${KNOWLEDGE_DATA_DIR:?Supply the directory with the approved catalog and documents}:/app/data:ro
+    environment:
+      LOCAL_AUTH: "0"
+      LOCAL_URL: ${PORTAL_ORIGIN:?Set the HTTPS portal origin}
+  api:
+    environment:
+      LOCAL_AUTH: "0"
+      PORTAL_ORIGIN: ${PORTAL_ORIGIN:?Set the HTTPS portal origin}
+      BROWSER_SIGNING_KEY: ${BROWSER_SIGNING_KEY:?Supply a shared signing key}
+      OIDC_ISSUER: ${OIDC_ISSUER:?Supply the trusted organization issuer}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Register the web client in the organization IdP}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Supply the web client secret}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:?Supply the API audience}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:?Supply the trusted HTTPS JWKS endpoint}
+      OIDC_GROUP_EMPLOYEE: ${OIDC_GROUP_EMPLOYEE:?Map the employee group}
+      OIDC_GROUP_REVIEWER: ${OIDC_GROUP_REVIEWER:?Map the support group}
+      OIDC_GROUP_EXECUTIVE: ${OIDC_GROUP_EXECUTIVE:?Map the executive group}

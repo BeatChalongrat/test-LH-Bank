@@ -1,0 +1,34 @@
+# Run with -p folio-capacity -f compose.yaml -f evaluation/capacity.compose.yaml.
+# This stack has its own database, API, accounts and cache. It uses the deployed LLM.
+services:
+  db:
+    networks:
+      default:
+        aliases: [capacity-db]
+    environment:
+      POSTGRES_DB: capacity
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U desk_owner -d capacity"]
+  seed:
+    environment:
+      DATABASE_URL: postgresql+psycopg://desk_owner:${DB_PASSWORD}@db/capacity
+    volumes:
+      - ./var/capacity:/state
+    command: ["python","-m","evaluation.capacity_seed"]
+  indexer:
+    environment:
+      DATABASE_URL: postgresql+psycopg://desk_owner:${DB_PASSWORD}@db/capacity
+  api:
+    ports: !override ["127.0.0.1:18770:8000"]
+    environment:
+      PORTAL_ORIGIN: http://127.0.0.1:18770
+      DATABASE_URL: postgresql+psycopg://desk_web:${WEB_DB_PASSWORD}@capacity-db/capacity
+      LLM_BASE_URL: ${BENCH_LLM_BASE_URL:-http://enterprise-knowledge-desk-llm-1:8080/v1}
+      LLM_PROTOCOL: llama
+    depends_on: !override
+      seed: {condition: service_completed_successfully}
+    networks: [default, inference]
+networks:
+  inference:
+    external: true
+    name: enterprise-knowledge-desk_default

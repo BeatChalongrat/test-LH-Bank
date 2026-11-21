@@ -1,0 +1,95 @@
+{
+  "corpus": "8 mock documents; one organization; role-scoped retrieval",
+  "profile": "open-loop, seeded randomized 60% hot / 40% unique substantive scenario variants",
+  "target_rps": 18.0,
+  "requests": 5000,
+  "responses": 5000,
+  "elapsed_s": 293.422,
+  "completed_rps": 17.04,
+  "distinct_subjects": 5000,
+  "unique_cold_questions": 2000,
+  "actual_cache_hits": 3000,
+  "cache_mix_mismatches": 0,
+  "verified_responses": 3816,
+  "http_codes": {
+    "200": 5000
+  },
+  "reasons": {
+    "evidence": 3816,
+    "inference_overloaded": 1168,
+    "generator_unavailable": 16
+  },
+  "all": {
+    "p50_ms": 107.68,
+    "p95_ms": 14593.76,
+    "p99_ms": 24127.01
+  },
+  "cold": {
+    "p50_ms": 8078.66,
+    "p95_ms": 19988.84,
+    "p99_ms": 28312.87
+  },
+  "warm": {
+    "p50_ms": 65.91,
+    "p95_ms": 183.99,
+    "p99_ms": 291.47
+  },
+  "traces_joined": 5000,
+  "generation_calls": 832,
+  "decision_routes": {
+    "extractive": 366,
+    "llm": 450,
+    "unsuccessful": 16
+  },
+  "replica_completions": {
+    "0": 450
+  },
+  "server_admission": {
+    "p50_ms": 8000.67,
+    "p95_ms": 8004.14,
+    "p99_ms": 8009.63
+  },
+  "reader_inference": {
+    "p50_ms": 100.89,
+    "p95_ms": 200.93,
+    "p99_ms": 274.3
+  },
+  "llm_http": {
+    "p50_ms": 7251.7,
+    "p95_ms": 18196.07,
+    "p99_ms": 20436.09
+  },
+  "launch_lag": {
+    "p50_ms": 2.73,
+    "p95_ms": 20.71,
+    "p99_ms": 24.76
+  },
+  "retrieval": {
+    "p50_ms": 49.56,
+    "p95_ms": 116.04,
+    "p99_ms": 184.73
+  },
+  "model_roundtrip": {
+    "p50_ms": 4042.84,
+    "p95_ms": 18177.85,
+    "p99_ms": 22119.52
+  },
+  "queue_and_transport_estimate": {
+    "p50_ms": 4782.87,
+    "p95_ms": 14903.68,
+    "p99_ms": 18100.46
+  },
+  "prompt_compute": {
+    "p50_ms": 1626.33,
+    "p95_ms": 3487.49,
+    "p99_ms": 5362.81
+  },
+  "tokens_evaluated": {
+    "prompt": 22033,
+    "output": 684
+  },
+  "trace_log_sha256": "1c2f907ad5f44bdf3a4007484d7070ab88c03e6703f800ea45f39bea9de6566f",
+  "worst_minute_p95_ms": 15422.02,
+  "passed": false,
+  "verified_within_3s": 3025
+}

@@ -1,0 +1,28 @@
+groups:
+  - name: knowledge
+    rules:
+      - alert: KnowledgeApiUnavailable
+        expr: up{job="knowledge"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Knowledge API scrape unavailable"}
+      - alert: KnowledgeGeneratorErrors
+        expr: sum(knowledge_queries_5m{reason="generator_unavailable"}) / clamp_min(sum(knowledge_queries_5m),1) > 0.02
+        for: 5m
+        labels: {severity: high}
+        annotations: {summary: "Model failures exceed two percent"}
+      - alert: KnowledgeSlowResponses
+        expr: knowledge_latency_p95_ms_10m > 3000
+        for: 10m
+        labels: {severity: high}
+        annotations: {summary: "Query p95 exceeds three seconds"}
+      - alert: KnowledgeInferenceSaturated
+        expr: sum(knowledge_queries_5m{reason="inference_overloaded"}) / clamp_min(sum(knowledge_queries_5m),1) > 0.01
+        for: 5m
+        labels: {severity: high}
+        annotations: {summary: "More than one percent of questions exceeded the inference queue budget"}
+      - alert: KnowledgeReviewBacklog
+        expr: knowledge_oldest_open_seconds > 86400
+        for: 30m
+        labels: {severity: warning}
+        annotations: {summary: "A review ticket is older than one day"}

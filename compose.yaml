@@ -1,0 +1,135 @@
+name: enterprise-knowledge-desk
+services:
+  db:
+    image: pgvector/pgvector:pg16@sha256:7d400e340efb42f4d8c9c12c6427adb253f726881a9985d2a471bf0eed824dff
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: knowledge
+      POSTGRES_USER: desk_owner
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Run python scripts/configure.py}
+      DESK_DB_PASSWORD: ${WEB_DB_PASSWORD:?Run python scripts/configure.py}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./deploy/init-role.sh:/docker-entrypoint-initdb.d/10-role.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U desk_owner -d knowledge"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server@sha256:ae28f5c2046de51dfd00c9116a36fe44b5e8703ef730d0aea69082781eecb1f7
+    restart: unless-stopped
+    command: ["-m","/models/qwen.gguf","--host","0.0.0.0","--port","8080","--ctx-size","16384","--parallel","4","--threads","4","--threads-batch","6","--cache-ram","256","--metrics","--alias","knowledge-local"]
+    volumes:
+      - ./models:/models:ro
+    healthcheck:
+      test: ["CMD","curl","-fsS","http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 4s
+      retries: 30
+  seed:
+    build: .
+    image: enterprise-knowledge-desk:local
+    user: "0:0"
+    environment:
+      DATABASE_URL: postgresql+psycopg://desk_owner:${DB_PASSWORD}@db/knowledge
+      STATE_DIR: /state
+      MODEL_DIR: /models
+      LOCAL_AUTH: ${LOCAL_AUTH:-1}
+      LLM_PROTOCOL: ${LLM_PROTOCOL:-auto}
+      LLAMA_SLOTS: ${LLAMA_SLOTS:-4}
+      EVIDENCE_READER: ${EVIDENCE_READER:-auto}
+      READER_THREADS: ${READER_THREADS:-2}
+      LOCAL_URL: http://127.0.0.1:${DESK_PORT:-8765}
+    volumes:
+      - ./var/compose:/state
+      - ./models:/models:ro
+      - ./data:/app/data:ro
+    command: ["python","-m","knowledge","bootstrap"]
+    depends_on:
+      db: {condition: service_healthy}
+  indexer:
+    image: enterprise-knowledge-desk:local
+    pull_policy: never
+    restart: unless-stopped
+    command: ["python","-m","knowledge.document_worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://desk_owner:${DB_PASSWORD}@db/knowledge
+      STATE_DIR: /tmp/desk-indexer
+      MODEL_DIR: /models
+    volumes:
+      - ./models:/models:ro
+    depends_on:
+      seed: {condition: service_completed_successfully}
+  api:
+    image: enterprise-knowledge-desk:local
+    pull_policy: never
+    restart: unless-stopped
+    ports: ["127.0.0.1:${DESK_PORT:-8765}:8000"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://desk_web:${WEB_DB_PASSWORD}@db/knowledge
+      WEB_CONCURRENCY: ${API_WORKERS:-1}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-8}
+      DB_POOL_OVERFLOW: ${DB_POOL_OVERFLOW:-8}
+      STATE_DIR: /tmp/desk
+      MODEL_DIR: /models
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://llm:8080/v1}
+      LLAMA_SLOTS: ${LLAMA_SLOTS:-4}
+      LLAMA_EXTRA_URL: ${LLAMA_EXTRA_URL:-}
+      LLAMA_EXTRA_SLOTS: ${LLAMA_EXTRA_SLOTS:-0}
+      EVIDENCE_READER: ${EVIDENCE_READER:-auto}
+      READER_THREADS: ${READER_THREADS:-2}
+      INFERENCE_IN_FLIGHT: ${INFERENCE_IN_FLIGHT:-16}
+      INFERENCE_QUEUE_TIMEOUT: ${INFERENCE_QUEUE_TIMEOUT:-8}
+      LLM_PROTOCOL: ${LLM_PROTOCOL:-auto}
+      LLM_MODEL: ${LLM_MODEL:-knowledge-local}
+      LLM_REVISION: ${LLM_REVISION:-qwen2.5-1.5b-q4_k_m-91cad511}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.42}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-22}
+      METRICS_TOKEN: ${METRICS_TOKEN}
+      LOCAL_AUTH: ${LOCAL_AUTH:-1}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:-}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
+      OIDC_GROUP_EMPLOYEE: ${OIDC_GROUP_EMPLOYEE:-}
+      OIDC_GROUP_REVIEWER: ${OIDC_GROUP_REVIEWER:-}
+      OIDC_GROUP_EXECUTIVE: ${OIDC_GROUP_EXECUTIVE:-}
+      OIDC_GROUP_ADMIN: ${OIDC_GROUP_ADMIN:-}
+      PORTAL_ORIGIN: ${PORTAL_ORIGIN:-http://127.0.0.1:${DESK_PORT:-8765}}
+      BROWSER_SIGNING_KEY: ${BROWSER_SIGNING_KEY:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid profile}
+    volumes:
+      - ./models:/models:ro
+    depends_on:
+      seed: {condition: service_completed_successfully}
+      llm: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request;urllib.request.urlopen('http://localhost:8000/health/ready',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  monitor:
+    image: prom/prometheus:v2.53.0
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    ports: ["127.0.0.1:${MONITOR_PORT:-8767}:9090"]
+    environment:
+      METRICS_TOKEN: ${METRICS_TOKEN}
+    entrypoint: ["/bin/sh","-ec"]
+    command:
+      - |
+        umask 077
+        printf '%s' "$$METRICS_TOKEN" > /tmp/desk-metrics-token
+        exec /bin/prometheus --config.file=/etc/prometheus/desk.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=15d
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/desk.yml:ro
+      - ./deploy/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - metricsdata:/prometheus
+    depends_on:
+      api: {condition: service_healthy}
+volumes:
+  dbdata:
+  metricsdata:
