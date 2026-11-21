@@ -38,7 +38,7 @@ def admin_system(tmp_path, monkeypatch):
         payload = json.loads(req.content)
         if req.url.path.endswith("/messages"):
             assert (
-                req.headers["x-api-key"] == "test-anthropic"
+                req.headers["x-api-key"] in {"test-anthropic", "rotated-secret"}
                 and "authorization" not in req.headers
             )
             ref = payload["tools"][0]["input_schema"]["properties"]["choice"]["enum"][0]
@@ -136,6 +136,9 @@ def test_admin_routes_rotate_revoke_and_cache(admin_system):
         json={"api_key": "rotated-secret", "version": 1},
     )
     assert response.status_code == 200 and "rotated-secret" not in response.text
+    assert (
+        ask()["cached"] is False and sent[-1].headers["x-api-key"] == "rotated-secret"
+    )
     assert select(None, 6).status_code == 200
     assert (
         api.post(
@@ -199,3 +202,48 @@ def test_embedding_onboarding_and_incompatible_index(tmp_path, monkeypatch):
             assert active_profile(conn, "embedding")["id"] == a
         assert enc.space.startswith("api-")
     engine.dispose()
+
+
+def test_admin_probe_only_sends_sample_and_masks_upstream_errors(
+    admin_system, monkeypatch
+):
+    api, keys, _, _ = admin_system
+    admin = keys["admin"]
+    r = api.post(
+        "/api/admin/providers",
+        headers=admin,
+        json={
+            "provider": "openai",
+            "purpose": "chat",
+            "name": "probe",
+            "model": "sample",
+            "api_key": "test-probe",
+        },
+    )
+    path = f"/api/admin/providers/{r.json()['id']}/test"
+    from knowledge import provider_admin
+    from knowledge.service import Selection
+
+    original = provider_admin.Generator
+
+    def generator(profile):
+        model = original(profile)
+
+        def check(q, rows):
+            assert (
+                len(rows) == 1 and rows[0]["ref"] == "SAMPLE#1" and "sample card" in q
+            )
+            return Selection(1, {})
+
+        model.select = check
+        return model
+
+    monkeypatch.setattr(provider_admin, "Generator", generator)
+    assert api.post(path, headers=admin, json={}).json()["ok"]
+
+    def failing(_):
+        raise ValueError("test-probe")
+
+    monkeypatch.setattr(provider_admin, "Generator", failing)
+    result = api.post(path, headers=admin, json={})
+    assert result.status_code == 422 and "test-probe" not in result.text

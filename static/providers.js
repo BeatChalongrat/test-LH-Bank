@@ -7,6 +7,7 @@ function fillVendors() {
   for (const vendor of providerState.providers.filter((item) => item.purposes.includes($("provider-purpose").value))) {
     select.add(new Option(vendor.name, vendor.id));
   }
+  if ([...select.options].some((option) => option.value === "openai")) select.value = "openai";
 }
 
 function editProvider(profile) {
