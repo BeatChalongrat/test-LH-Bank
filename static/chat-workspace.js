@@ -17,50 +17,20 @@ const stageLabels = {
   draft: "ส่งคำขอให้โมเดลเขียนร่าง / Generate draft",
   case_status: "ตรวจเคสของบัญชีนี้ / Read your cases",
 };
-const toolHints = {
-  auto: "แนบ Excel แล้วขอสรุปยอด ทำกราฟ และสร้าง PowerPoint ได้ในข้อความเดียว โมเดลที่ตั้งค่าไว้จะได้รับคำขอและชื่อคอลัมน์ / For reports, your request and column names go to the configured model.",
-  attachment:
-    "แนบไฟล์แล้วถาม หรือพิมพ์ “สรุป” เพื่อดูข้อความตัวอย่าง / Ask about the file or enter “preview”.",
-  data: "แนบ CSV หรือ Excel แล้วพิมพ์ “แสดงตาราง” / Attach a spreadsheet and enter “show table”.",
-  calculator:
-    'ลอง (1200 + 300) / 3 หรือ sum(col("Sales")) เมื่อแนบตาราง / Enter a formula.',
-  draft:
-    "ระบุสิ่งที่ต้องการเขียน โมเดลที่แอดมินเลือกจะได้รับคำขอและข้อความจากไฟล์แนบ / Your brief and attached text go to the configured chat provider.",
-  case_status:
-    "พิมพ์ “ดูเคสของฉัน” หรือระบุเลขเคส / Ask for your cases or enter a case reference.",
-};
-function updateTool() {
-  $("tool-hint").textContent = toolHints[$("chat-mode").value];
-  $("mode-label").textContent =
-    $("chat-mode").selectedOptions[0].textContent.split(" / ")[0];
+function updateAttachment() {
   $("chat-file-chip").hidden = !attachedFile;
-  $("chat-file-chip").textContent = attachedFile
-    ? attachedFile.name + " ×"
-    : "";
+  const slot = $("chat-file-link");
+  slot.replaceChildren();
+  if (attachedFile) slot.append(filePreviewButton(chatId, attachedFile));
 }
 function clearChatTools() {
   activeStream?.abort();
+  if (filePreview.open) filePreview.close();
+  previewRequest?.abort();
   attachedFile = null;
   $("chat-file").value = "";
-  $("tool-picker").open = false;
-  $("chat-mode").value = "auto";
-  updateTool();
+  updateAttachment();
 }
-$("chat-mode").onchange = () => {
-  updateTool();
-  $("tool-picker").open = false;
-  $("question").focus();
-};
-document.addEventListener("pointerdown", (event) => {
-  if (!$("tool-picker").contains(event.target)) $("tool-picker").open = false;
-});
-$("tool-picker").addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    $("tool-picker").open = false;
-    $("tool-picker").querySelector("summary").focus();
-  }
-});
 $("question").onkeydown = (event) => {
   if (
     event.key === "Enter" &&
@@ -73,10 +43,10 @@ $("question").onkeydown = (event) => {
   }
 };
 $("pick-chat-file").onclick = () => guard(() => $("chat-file").click());
-$("chat-file-chip").onclick = () => {
+$("chat-file-remove").onclick = () => {
   attachedFile = null;
   $("chat-file").value = "";
-  updateTool();
+  updateAttachment();
 };
 const samples = {
   sales: [
@@ -180,9 +150,8 @@ async function attachToChat(loadFile, prompt) {
         Object.values(samples).some(([, previous]) => previous === current)
       )
         $("question").value = prompt;
-      $("chat-mode").value = "auto";
     }
-    updateTool();
+    updateAttachment();
   } catch (error) {
     if (version === chatVersion) $("chat-progress").textContent = error.message;
   } finally {
@@ -288,12 +257,6 @@ function renderDataset(result) {
   area.append(wrapper);
   return area;
 }
-function fileLabel(name) {
-  const type = name.split(".").at(-1).toUpperCase();
-  const tag = el("span", undefined, "message-file");
-  tag.append(icon("file-text"), el("span", name), el("small", type));
-  return tag;
-}
 function reportCard(result) {
   const { summary, chart } = result;
   const card = el("section", undefined, "report-card");
@@ -358,24 +321,34 @@ function reportCard(result) {
   return card;
 }
 function slideDownload(chat, turn, result) {
-  const link = el("a", undefined, "slide-download");
+  const url = "/api/conversations/" + chat + "/turns/" + turn + "/export/pptx";
+  const filename = (result.report_title || "รายงาน") + ".pptx";
+  const card = el("div", undefined, "slide-download");
+  const opener = button(
+    "",
+    () => showFilePreview(filename, url + "?preview=true", null, url),
+    "slide-opener",
+  );
   const thumb = el("span", undefined, "slide-thumb");
   thumb.append(icon("clipboard-list"), el("span", "PPTX"));
   const name = el("span", undefined, "slide-filename");
-  const filename = (result.report_title || "รายงาน") + ".pptx";
   name.append(
     el("strong", filename),
     el(
       "small",
-      "PowerPoint · " + Math.ceil(result.artifact.bytes / 1024) + " KB",
+      "ดูตัวอย่าง PowerPoint · " +
+        Math.ceil(result.artifact.bytes / 1024) +
+        " KB",
     ),
   );
-  const action = el("span", undefined, "slide-action");
-  action.append(icon("arrow-up-right"), el("span", "ดาวน์โหลด"));
-  link.href = "/api/conversations/" + chat + "/turns/" + turn + "/export/pptx";
+  opener.append(thumb, name);
+  const link = el("a", undefined, "slide-action");
+  link.append(icon("arrow-up-right"), el("span", "ดาวน์โหลด"));
+  link.href = url;
   link.download = filename;
-  link.append(thumb, name, action);
-  return link;
+  link.setAttribute("aria-label", "ดาวน์โหลด " + filename);
+  card.append(opener, link);
+  return card;
 }
 function responseActions(chat, turn, result) {
   const actions = el("div", undefined, "response-actions");
@@ -425,4 +398,3 @@ function responseActions(chat, turn, result) {
   actions.append(copy, menu);
   return actions;
 }
-updateTool();

@@ -96,7 +96,26 @@ def test_model_chains_tools_and_commits_deck_once(report_system):
     assert result["selected_tools"] == ["summarize", "chart", "powerpoint"]
     assert result["summary"]["total"] == "85500" and result["summary"]["records"] == 6
     assert result["planner"] == "model" and len(plans) == 1
+    attachment_preview = chat + "/attachments/" + message["attachment_id"] + "/preview"
+    preview = api.get(attachment_preview, headers=a).json()
+    assert preview["headers"] == ["เดือน", "สาขา", "ยอดขาย (บาท)", "จำนวนบิล"]
+    assert preview["row_count"] == 7
+    assert api.get(attachment_preview, headers=b).status_code == 404
+    assert (
+        api.get(
+            attachment_preview.replace(chat, "/api/conversations/" + str(uuid4())),
+            headers=a,
+        ).status_code
+        == 404
+    )
     path = result["artifact"]["url"]
+    deck_preview = api.get(path + "?preview=true", headers=a).json()
+    slides = deck_preview["slides"]
+    assert "85,500.00" in " ".join(slides[0]["text"])
+    assert [point["label"] for point in slides[1]["points"]] == MONTHS
+    assert [point["value"] for point in slides[1]["points"]] == SALES
+    assert slides[2]["table"][1][0] == MONTHS[0]
+    assert api.get(path + "?preview=true", headers=b).status_code == 404
     assert api.get(path, headers=b).status_code == 404
     assert (
         api.post(

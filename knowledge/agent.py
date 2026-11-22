@@ -18,6 +18,7 @@ from fastapi import Depends, HTTPException
 from fastapi.responses import Response, StreamingResponse
 from .chat_exports import FORMATS as EXPORTS, export_turn
 from .chat_generation import stream_text
+from .chat_previews import slide_view
 from .chat_tools import install_files, own_file, private_result, store_result
 from .sheet_report import choose_plan, make_report, report_request
 from .provider import ProviderCoolingDown
@@ -756,9 +757,13 @@ def install_agent(app, current, answer, run_model):
 
     @app.get("/api/conversations/{conversation_id}/turns/{turn_id}/export/{fmt}")
     async def download(
-        conversation_id: UUID, turn_id: UUID, fmt: str, user=Depends(current)
+        conversation_id: UUID,
+        turn_id: UUID,
+        fmt: str,
+        preview: bool = False,
+        user=Depends(current),
     ):
-        if fmt not in EXPORTS:
+        if fmt not in EXPORTS or (preview and fmt != "pptx"):
             raise HTTPException(404)
 
         def render():
@@ -792,12 +797,16 @@ def install_agent(app, current, answer, run_model):
                 if asset and asset["format"] == fmt:
                     if row.content is None:
                         raise HTTPException(404)
-                    return bytes(row.content)
-            return export_turn(
+                    binary = bytes(row.content)
+                    return slide_view(binary) if preview else binary
+            binary = export_turn(
                 fmt, row.result.get("report_title", row.question), row.result
             )
+            return slide_view(binary) if preview else binary
 
         data = await anyio.to_thread.run_sync(render, limiter=app.state.file_workers)
+        if preview:
+            return data
         return Response(
             data,
             media_type=EXPORTS[fmt],

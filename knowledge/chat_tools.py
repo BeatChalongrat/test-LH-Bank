@@ -1,5 +1,6 @@
 """Private chat attachments and bounded, read-only tools."""
 
+import base64
 import csv
 import io
 import json
@@ -18,6 +19,9 @@ from zipfile import ZipFile, BadZipFile
 import anyio
 import sqlalchemy as sa
 from fastapi import Depends, HTTPException, Request
+from fastapi.responses import Response
+
+from .chat_previews import attachment_view, pdf_thumbnail
 
 from .db import chat_files, events, turn_artifacts
 from .document_worker import extract
@@ -97,7 +101,10 @@ def parse_file(raw, name):
         blocks = extract(raw, name)
     if not blocks or sum(len(b[1]) for b in blocks) > 260000:
         raise ValueError("ไฟล์ว่างหรือข้อความยาวเกินไป · Empty or oversized file")
-    return {"blocks": blocks, "table": table}
+    payload = {"blocks": blocks, "table": table}
+    if ext == ".pdf" and (thumbnail := pdf_thumbnail(raw)):
+        payload["thumbnail"] = thumbnail
+    return payload
 
 
 def own_file(engine, user, chat, fid):
@@ -121,6 +128,19 @@ def own_file(engine, user, chat, fid):
 
 
 def install_files(app, current):
+    @app.get("/api/conversations/{chat}/attachments/{file_id}/preview")
+    def preview(chat: UUID, file_id: UUID, user=Depends(current)):
+        file = own_file(app.state.service.engine, user, str(chat), file_id.hex)
+        return attachment_view(file)
+
+    @app.get("/api/conversations/{chat}/attachments/{file_id}/thumbnail")
+    def thumbnail(chat: UUID, file_id: UUID, user=Depends(current)):
+        file = own_file(app.state.service.engine, user, str(chat), file_id.hex)
+        data = file["payload"].get("thumbnail")
+        if not data:
+            raise HTTPException(404)
+        return Response(base64.b64decode(data), media_type="image/jpeg")
+
     @app.post("/api/conversations/{chat}/attachments", status_code=201)
     async def upload(chat: UUID, name: str, request: Request, user=Depends(current)):
         if (

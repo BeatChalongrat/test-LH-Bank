@@ -12,6 +12,7 @@
     <script defer src="/static/directory.js"></script>
     <script defer src="/static/documents.js"></script>
     <script defer src="/static/providers.js"></script>
+    <script defer src="/static/file-preview.js"></script>
     <script defer src="/static/chat-workspace.js"></script>
     <script defer src="/static/agent.js"></script>
   </head>
@@ -158,25 +159,15 @@
             ></div>
             <div class="composer-area">
               <form id="query" class="composer">
-                <button type="button" class="attachment-chip" id="chat-file-chip" aria-label="นำไฟล์แนบออก / Remove attachment" hidden></button>
+                <div id="chat-file-chip" class="attachment-chip" hidden>
+                  <span id="chat-file-link"></span>
+                  <button type="button" id="chat-file-remove" aria-label="นำไฟล์แนบออก / Remove attachment" title="นำไฟล์แนบออก"><i data-icon="x"></i></button>
+                </div>
                 <label class="sr" for="question">ข้อความถึงผู้ช่วย / Message</label>
                 <textarea id="question" rows="1" maxlength="1200" minlength="2" required placeholder="ถามเรื่องงาน หรือแนบไฟล์ให้ช่วยวิเคราะห์…" autocomplete="off"></textarea>
                 <div class="composer-controls">
                   <button type="button" id="pick-chat-file" class="compose-action" title="แนบไฟล์ / Attach file"><i data-icon="upload"></i><span>แนบไฟล์</span></button>
                   <input id="chat-file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.csv,.md,.txt" hidden>
-                  <details class="tool-picker" id="tool-picker"><summary class="compose-action"><i data-icon="list-filter"></i><span id="mode-label">อัตโนมัติ</span><i data-icon="chevron-down"></i></summary>
-                    <div class="tool-popover">
-                      <label for="chat-mode">เครื่องมือ / Tools</label>
-                      <select id="chat-mode">
-                        <option value="auto">อัตโนมัติ / Auto</option>
-                        <option value="attachment">อ่านไฟล์แนบ / Read file</option>
-                        <option value="data">ตารางและกราฟ / Data</option>
-                        <option value="calculator">คำนวณ / Calculate</option>
-                        <option value="draft">ร่างเอกสาร / Draft</option>
-                        <option value="case_status">เคสของฉัน / My cases</option>
-                      </select><p class="meta" id="tool-hint"></p>
-                    </div>
-                  </details>
                   <button type="button" class="composer-stop" id="stop-chat" hidden>หยุด / Stop</button>
                   <button type="submit" class="composer-send" id="submitq" aria-label="ส่งข้อความ / Send" title="ส่งข้อความ (Enter)"><i data-icon="arrow-up-right"></i></button>
                 </div>
@@ -441,6 +432,14 @@
         <p id="provider-form-error" role="alert"></p>
         <button type="submit" class="primary">บันทึก / Save</button>
       </form>
+    </dialog>
+    <dialog id="file-preview" aria-labelledby="file-preview-title">
+      <div class="preview-head">
+        <h2 id="file-preview-title">ตัวอย่างไฟล์</h2>
+        <a id="file-preview-download" class="outline" hidden download>ดาวน์โหลด</a>
+        <button type="button" class="quiet close" id="file-preview-close" aria-label="ปิดตัวอย่างไฟล์" autofocus><i data-icon="x"></i></button>
+      </div>
+      <div id="file-preview-body"></div>
     </dialog>
     <dialog id="doc-dialog">
       <div class="dialog-head">

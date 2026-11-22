@@ -11,9 +11,8 @@ function busyChat(value) {
     "submitq",
     "question",
     "new-chat",
-    "chat-mode",
     "pick-chat-file",
-    "chat-file-chip",
+    "chat-file-remove",
   ])
     $(name).disabled = value;
   for (const b of document.querySelectorAll(
@@ -48,7 +47,7 @@ function renderTurn(question, r, chat, turnId, steps = []) {
     reply = el("div", undefined, "agent-message");
   turn.dataset.tool = r.tool;
   turn.dataset.contextUsed = String(r.used_context);
-  if (r.attachment) user.append(fileLabel(r.attachment.name));
+  if (r.attachment) user.append(filePreviewButton(chat, r.attachment));
   user.append(el("p", question));
   const label =
     r.status === "fallback"
@@ -175,7 +174,7 @@ async function openChat(id, seq) {
       ...rows.map((r) => renderTurn(r.question, r.result, id, r.id)),
     );
     attachedFile = rows.at(-1)?.result.attachment || null;
-    updateTool();
+    updateAttachment();
     markCurrentChat();
     $("result").scrollTop = $("result").scrollHeight;
     $("chat-progress").textContent = "";
@@ -219,19 +218,12 @@ async function sendChat() {
   if (sending || question.length < 2) return;
   const subject = me.subject,
     version = ++chatVersion;
-  const mode = $("chat-mode").value,
-    file = attachedFile?.id || null;
-  if (
-    !retry ||
-    retry.question !== question ||
-    retry.mode !== mode ||
-    retry.attachment_id !== file
-  )
+  const file = attachedFile?.id || null;
+  if (!retry || retry.question !== question || retry.attachment_id !== file)
     retry = {
       chat: chatId || crypto.randomUUID(),
       turn_id: crypto.randomUUID(),
       parent_id: lastTurn,
-      mode,
       attachment_id: file,
       question,
     };
@@ -243,7 +235,7 @@ async function sendChat() {
   $("stop-chat").hidden = false;
   const draft = el("article", undefined, "chat-turn");
   const userBox = el("div", undefined, "user-message");
-  if (attachedFile) userBox.append(fileLabel(attachedFile.name));
+  if (attachedFile) userBox.append(filePreviewButton(chat, attachedFile));
   userBox.append(el("p", question));
   const live = el("div", undefined, "agent-message"),
     text = el("p", "", "answer");
@@ -329,8 +321,7 @@ $("query").onsubmit = (e) => {
 for (const b of document.querySelectorAll("[data-prompt]"))
   b.onclick = () => {
     attachedFile = null;
-    $("chat-mode").value = "auto";
-    updateTool();
+    updateAttachment();
     $("question").value = b.dataset.prompt;
     $("query").requestSubmit();
   };
