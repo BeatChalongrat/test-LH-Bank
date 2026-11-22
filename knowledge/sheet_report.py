@@ -226,9 +226,17 @@ def make_report(engine, user, pending, file, selection, stage):
     points = [
         {"label": label, "value": float(value)} for label, value in totals.items()
     ]
+    # Keep the unit next to figures and use the measure name in titles.
+    label = re.sub(r"\s*\(([^()]*)\)\s*$", "", metric).strip() or metric
+    unit = metric[len(label) :].strip().strip("()")
+    grouping = {"เดือน": "รายเดือน", "สาขา": "รายสาขา", "ไตรมาส": "รายไตรมาส"}.get(
+        group, f"ตาม{group}" if group else ""
+    )
     summary = f"{metric} รวม {total:,.2f} จาก {count:,} รายการ"
     if group:
-        summary += f"\n{category}ที่มียอดสูงสุดคือ {top} รวม {totals[top]:,.2f}"
+        summary += f"\n{top} มียอดสูงสุดที่ {totals[top]:,.2f}" + (
+            f" {unit}" if unit else ""
+        )
     result = dict(
         status="answered",
         reason="tool_result",
@@ -255,7 +263,7 @@ def make_report(engine, user, pending, file, selection, stage):
             "rows": [[label, format(value, "f")] for label, value in totals.items()],
         },
         metrics=[metric] if plan.chart else [],
-        report_title=f"สรุป{metric}" + (f"ตาม{group}" if group else ""),
+        report_title=f"สรุป{label}{grouping}",
         summary={
             "metric": metric,
             "group": group,

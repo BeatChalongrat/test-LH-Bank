@@ -17,9 +17,20 @@ function busyChat(value) {
   ])
     $(name).disabled = value;
   for (const b of document.querySelectorAll(
-    "#chat-history button, [data-prompt]",
+    "#chat-history button, [data-prompt], [data-sample]",
   ))
     b.disabled = value;
+}
+let linkedChat = new URLSearchParams(location.search).get("chat");
+if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(linkedChat || ""))
+  linkedChat = null;
+function locateChat(id) {
+  if (view !== "ask") return;
+  const url = new URL(location.href);
+  if (id) url.searchParams.set("chat", id);
+  else url.searchParams.delete("chat");
+  url.hash = "ask";
+  history.replaceState(null, "", url);
 }
 function resetChat() {
   if (me) sessionStorage.removeItem(chatStorage());
@@ -37,7 +48,8 @@ function renderTurn(question, r, chat, turnId, steps = []) {
     reply = el("div", undefined, "agent-message");
   turn.dataset.tool = r.tool;
   turn.dataset.contextUsed = String(r.used_context);
-  user.append(el("small", "คุณ", "meta"), el("p", question));
+  if (r.attachment) user.append(fileLabel(r.attachment.name));
+  user.append(el("p", question));
   const label =
     r.status === "fallback"
       ? "ส่งต่อให้เจ้าหน้าที่แล้ว"
@@ -53,7 +65,22 @@ function renderTurn(question, r, chat, turnId, steps = []) {
               data: "ข้อมูลในไฟล์ / File data",
               attachment: "ข้อความในไฟล์ / File passages",
             }[r.tool] || "คำตอบจากเอกสาร";
-  reply.append(el("strong", label), el("p", r.answer, "answer"));
+  const byline = el("div", undefined, "assistant-byline"),
+    mark = el("span", undefined, "reply-mark");
+  mark.append(icon("messages-square"));
+  byline.append(mark, el("strong", "ผู้ช่วยพนักงาน"));
+  reply.append(byline);
+  const report = r.tool === "sheet_report" && r.summary && r.table;
+  if (report) {
+    const note = r.answer.split("\n").slice(1).join("\n");
+    if (note) reply.append(el("p", note, "answer"));
+    reply.append(reportCard(r));
+    if (r.artifact?.format === "pptx" && chat && turnId)
+      reply.append(slideDownload(chat, turnId, r));
+  } else {
+    if (r.status !== "answered") reply.append(el("strong", label));
+    reply.append(el("p", r.answer, "answer"));
+  }
   if (r.used_context)
     reply.append(
       el(
@@ -75,14 +102,23 @@ function renderTurn(question, r, chat, turnId, steps = []) {
     link.rel = "noopener";
     attribution.replaceChildren(link);
   }
-  reply.append(attribution);
+  if (!report) reply.append(attribution);
   if (r.ticket_id) reply.append(button("ติดตามรายการ", () => go("queue")));
   const info = el("details", undefined, "trace");
   info.append(
     el("summary", "ที่มาและขั้นตอน / Sources & steps"),
     el("small", "Trace ID · " + r.trace_id, "meta"),
   );
-  if (r.planner) info.append(el("p",r.planner==="model" ? "โมเดลเลือกเครื่องมือ / Model-selected tools" : "ใช้กฎพื้นฐาน ยังไม่ได้เชื่อมโมเดล / Built-in rules, no chat model configured","meta"));
+  if (r.planner)
+    info.append(
+      el(
+        "p",
+        r.planner === "model"
+          ? "โมเดลเลือกเครื่องมือ / Model-selected tools"
+          : "ใช้กฎพื้นฐาน ยังไม่ได้เชื่อมโมเดล / Built-in rules, no chat model configured",
+        "meta",
+      ),
+    );
   const usedStages = r.steps || steps;
   if (usedStages.length)
     info.append(
@@ -95,7 +131,8 @@ function renderTurn(question, r, chat, turnId, steps = []) {
         "meta",
       ),
     );
-  if (r.table) reply.append(renderDataset(r));
+  if (report) info.append(attribution);
+  if (r.table && !report) reply.append(renderDataset(r));
   reply.append(info);
   if (chat && turnId) reply.append(responseActions(chat, turnId, r));
   turn.append(user, reply);
@@ -130,6 +167,7 @@ async function openChat(id, seq) {
     const rows = await api("/api/conversations/" + id);
     if (version !== chatVersion || seq !== epoch) return;
     chatId = id;
+    locateChat(id);
     lastTurn = rows.at(-1)?.id || null;
     retry = null;
     sessionStorage.setItem(chatStorage(), id);
@@ -143,7 +181,10 @@ async function openChat(id, seq) {
     $("chat-progress").textContent = "";
   } catch (err) {
     if (version === chatVersion && seq === epoch) {
-      if (err.status === 404) resetChat();
+      if (err.status === 404) {
+        resetChat();
+        locateChat(null);
+      }
       $("chat-progress").textContent = "";
       message(err.message);
     }
@@ -156,17 +197,21 @@ async function refreshChats(seq) {
   const version = chatVersion,
     rows = await api("/api/conversations");
   if (seq !== epoch || version !== chatVersion || sending) return;
-  const selected = chatId || sessionStorage.getItem(chatStorage());
+  const requested = linkedChat;
+  linkedChat = null;
+  const selected = requested || chatId || sessionStorage.getItem(chatStorage());
   $("chat-history").replaceChildren(...rows.map(historyButton));
   if (!rows.length)
     $("chat-history").append(el("p", "ยังไม่มีบทสนทนา", "meta"));
-  if (selected && rows.some((r) => r.id === selected)) {
+  if (selected && (requested || rows.some((r) => r.id === selected))) {
     await openChat(selected, seq);
   } else if (selected) resetChat();
 }
 $("new-chat").onclick = () => {
   if (compactMenu.matches) setMenu(false);
+  linkedChat = null;
   resetChat();
+  locateChat(null);
   $("question").focus();
 };
 async function sendChat() {
@@ -198,10 +243,12 @@ async function sendChat() {
   $("stop-chat").hidden = false;
   const draft = el("article", undefined, "chat-turn");
   const userBox = el("div", undefined, "user-message");
-  userBox.append(el("small", "คุณ / You", "meta"), el("p", question));
+  if (attachedFile) userBox.append(fileLabel(attachedFile.name));
+  userBox.append(el("p", question));
   const live = el("div", undefined, "agent-message"),
     text = el("p", "", "answer");
-  live.append(text);
+  const working = el("div", "กำลังดำเนินการ…", "live-stage");
+  live.append(working, text);
   draft.append(userBox, live);
   $("result").append(draft);
   const steps = [];
@@ -212,12 +259,15 @@ async function sendChat() {
         text.append(document.createTextNode(frame.value));
       if (frame.event === "stage") {
         steps.push(frame.value);
+        working.textContent =
+          stageLabels[frame.value]?.split(" / ")[0] || "กำลังดำเนินการ…";
         $("chat-progress").textContent = stageLabels[frame.value] || "";
       }
       $("result").scrollTop = $("result").scrollHeight;
     });
     if (version !== chatVersion || me?.subject !== subject) return;
     chatId = chat;
+    locateChat(chat);
     lastTurn = payload.turn_id;
     retry = null;
     sessionStorage.setItem(chatStorage(), chat);
@@ -266,7 +316,10 @@ async function sendChat() {
       activeStream = null;
       $("stop-chat").hidden = true;
     }
-    if (version === chatVersion) busyChat(false);
+    if (version === chatVersion) {
+      busyChat(false);
+      if (view === "ask") $("question").focus();
+    }
   }
 }
 $("query").onsubmit = (e) => {
@@ -296,7 +349,9 @@ async function showAdmin(seq) {
   $("admin-providers").hidden = me?.role !== "admin";
   $("admin-documents").hidden = me?.role !== "admin";
   if (!me) {
-    $("admin-gate").replaceChildren(gated("เข้าสู่ระบบด้วยบัญชีผู้ดูแล / Sign in as an admin"));
+    $("admin-gate").replaceChildren(
+      gated("เข้าสู่ระบบด้วยบัญชีผู้ดูแล / Sign in as an admin"),
+    );
     return;
   }
   if (me.role !== "admin") {

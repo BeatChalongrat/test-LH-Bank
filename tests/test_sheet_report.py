@@ -15,7 +15,7 @@ from knowledge.provider import ProviderBackoff
 from knowledge.security import provision
 from knowledge.service import Generator, Service
 from knowledge.sheet_report import choose_plan
-from scripts.test_sales_report_api import MONTHS, QUESTION, SALES, workbook
+from scripts.test_sales_report_api import MONTHS, QUESTION, SALES
 
 
 @pytest.fixture
@@ -59,10 +59,12 @@ def report_system(tmp_path, monkeypatch):
 
 def attach(api, owner):
     chat = "/api/conversations/" + str(uuid4())
+    example = api.get("/static/samples/sales-q1.xlsx")
+    assert example.status_code == 200
     response = api.post(
         chat + "/attachments",
         params={"name": "sales.xlsx"},
-        content=workbook(),
+        content=example.content,
         headers=owner,
     )
     assert response.status_code == 201

@@ -282,7 +282,8 @@ def run(out):
         admin.screenshot(path=out / "admin.png", full_page=True)
 
         def query_cases():
-            employee.locator("#ask-cases").click()
+            employee.locator("#question").fill("ดูเคสของฉัน")
+            employee.locator("#question").press("Enter")
             return employee.locator(".chat-turn").last.locator(".agent-message")
 
         admin.get_by_role("button", name="ปิดเครื่องมือตรวจเคส", exact=True).click()

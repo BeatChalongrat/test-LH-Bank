@@ -7,6 +7,7 @@
     <title>พอร์ทัลพนักงาน</title>
     <link rel="icon" href="/static/assets/lh-favicon.png" type="image/png" />
     <link rel="stylesheet" href="/static/app.css" />
+    <link rel="stylesheet" href="/static/conversation.css" />
     <script defer src="/static/app.js"></script>
     <script defer src="/static/directory.js"></script>
     <script defer src="/static/documents.js"></script>
@@ -145,10 +146,8 @@
         <section id="ask" class="chat-page" aria-label="แชตผู้ช่วย AI" hidden>
           <div class="chat-stage">
             <div id="chat-intro">
-              <span class="assistant-mark" aria-hidden="true"
-                ><i data-icon="messages-square"></i
-              ></span>
-              <p id="greeting">ผู้ช่วย AI</p>
+              <div class="welcome-mark" aria-hidden="true"><i data-icon="messages-square"></i></div>
+              <p id="greeting">ผู้ช่วยพนักงาน</p>
               <h1>วันนี้ให้ช่วยเรื่องอะไร?</h1>
             </div>
             <div
@@ -158,41 +157,38 @@
               aria-label="ข้อความในบทสนทนา"
             ></div>
             <div class="composer-area">
-              <div class="chat-toolbar">
-                <label for="chat-mode" class="sr">เครื่องมือ / Tool</label>
-                <select id="chat-mode">
-                  <option value="auto">ถามผู้ช่วย / Ask</option>
-                  <option value="attachment">อ่านไฟล์แนบ / Read file</option>
-                  <option value="data">ตารางและกราฟ / Data</option>
-                  <option value="calculator">คำนวณ / Calculate</option>
-                  <option value="draft">ร่างเอกสาร / Draft</option>
-                  <option value="case_status">เคสของฉัน / My cases</option>
-                </select>
-                <button type="button" class="outline" id="pick-chat-file"><i data-icon="upload"></i>แนบไฟล์ / Attach</button>
-                <input id="chat-file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.csv,.md,.txt" hidden>
-                <button type="button" class="account-chip" id="chat-file-chip" aria-label="นำไฟล์แนบออก / Remove attachment" hidden></button>
-                <button type="button" class="outline" id="stop-chat" hidden>หยุด / Stop</button>
-              </div>
-              <p class="meta tool-hint" id="tool-hint"></p>
-              <form id="query" class="searchbar">
-                <label class="sr" for="question">ถามผู้ช่วย AI</label>
-                <input
-                  id="question"
-                  maxlength="1200"
-                  minlength="2"
-                  required
-                  placeholder="พิมพ์คำถามเกี่ยวกับงาน…"
-                  autocomplete="off"
-                />
-                <button
-                  class="primary"
-                  id="submitq"
-                  aria-label="ส่งข้อความ"
-                  title="ส่งข้อความ"
-                >
-                  <i data-icon="send"></i>
-                </button>
+              <form id="query" class="composer">
+                <button type="button" class="attachment-chip" id="chat-file-chip" aria-label="นำไฟล์แนบออก / Remove attachment" hidden></button>
+                <label class="sr" for="question">ข้อความถึงผู้ช่วย / Message</label>
+                <textarea id="question" rows="1" maxlength="1200" minlength="2" required placeholder="ถามเรื่องงาน หรือแนบไฟล์ให้ช่วยวิเคราะห์…" autocomplete="off"></textarea>
+                <div class="composer-controls">
+                  <button type="button" id="pick-chat-file" class="compose-action" title="แนบไฟล์ / Attach file"><i data-icon="upload"></i><span>แนบไฟล์</span></button>
+                  <input id="chat-file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.csv,.md,.txt" hidden>
+                  <details class="tool-picker" id="tool-picker"><summary class="compose-action"><i data-icon="list-filter"></i><span id="mode-label">อัตโนมัติ</span><i data-icon="chevron-down"></i></summary>
+                    <div class="tool-popover">
+                      <label for="chat-mode">เครื่องมือ / Tools</label>
+                      <select id="chat-mode">
+                        <option value="auto">อัตโนมัติ / Auto</option>
+                        <option value="attachment">อ่านไฟล์แนบ / Read file</option>
+                        <option value="data">ตารางและกราฟ / Data</option>
+                        <option value="calculator">คำนวณ / Calculate</option>
+                        <option value="draft">ร่างเอกสาร / Draft</option>
+                        <option value="case_status">เคสของฉัน / My cases</option>
+                      </select><p class="meta" id="tool-hint"></p>
+                    </div>
+                  </details>
+                  <button type="button" class="composer-stop" id="stop-chat" hidden>หยุด / Stop</button>
+                  <button type="submit" class="composer-send" id="submitq" aria-label="ส่งข้อความ / Send" title="ส่งข้อความ (Enter)"><i data-icon="arrow-up-right"></i></button>
+                </div>
               </form>
+              <section id="sample-files" aria-labelledby="sample-heading">
+                <h2 id="sample-heading">ลองจากไฟล์ตัวอย่าง</h2>
+                <div class="sample-grid">
+                  <button type="button" class="sample-card" data-sample="sales"><span class="file-tile sheet"><i data-icon="files"></i></span><span><strong>สรุปยอดขายไตรมาส 1</strong><small>Excel · กราฟและสไลด์</small></span><i data-icon="arrow-up-right"></i></button>
+                  <button type="button" class="sample-card" data-sample="training"><span class="file-tile pdf"><i data-icon="calendar-days"></i></span><span><strong>กำหนดการอบรม</strong><small>PDF · อ่านกำหนดการ</small></span><i data-icon="arrow-up-right"></i></button>
+                  <button type="button" class="sample-card" data-sample="notes"><span class="file-tile note"><i data-icon="messages-square"></i></span><span><strong>บันทึกแชตฝ่ายสนับสนุน</strong><small>TXT · อ่านบทสนทนา</small></span><i data-icon="arrow-up-right"></i></button>
+                </div>
+              </section>
               <div class="prompts" aria-label="คำถามที่ใช้บ่อย">
                 <button
                   type="button"
