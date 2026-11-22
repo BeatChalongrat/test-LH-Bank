@@ -110,6 +110,19 @@ turns = sa.Table(
     C("created", sa.Float, nullable=False),
     C("result", sa.JSON, nullable=False),
 )
+turn_artifacts = sa.Table(
+    "conversation_artifacts",
+    meta,
+    C("conversation", T, primary_key=True),
+    C("turn_id", T, primary_key=True),
+    C("format", T, primary_key=True),
+    C("content", sa.LargeBinary, nullable=False),
+    sa.ForeignKeyConstraint(
+        ["conversation", "turn_id"],
+        ["conversation_turns.conversation", "conversation_turns.id"],
+        ondelete="CASCADE",
+    ),
+)
 tool_controls = sa.Table(
     "tool_controls",
     meta,
@@ -377,7 +390,7 @@ def initialize(engine):
             )
             conn.execute(
                 sa.text(
-                    "GRANT SELECT,INSERT ON private_chat_files,conversation_turns,tool_changes TO desk_web"
+                    "GRANT SELECT,INSERT ON private_chat_files,conversation_turns,conversation_artifacts,tool_changes TO desk_web"
                 )
             )
             conn.execute(

@@ -19,6 +19,7 @@ from fastapi.responses import Response, StreamingResponse
 from .chat_exports import FORMATS as EXPORTS, export_turn
 from .chat_generation import stream_text
 from .chat_tools import install_files, own_file, private_result, store_result
+from .sheet_report import choose_plan, make_report, report_request
 from .provider import ProviderCoolingDown
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -29,6 +30,7 @@ from .db import (
     revision,
     revision_value,
     tickets,
+    turn_artifacts,
     tool_changes,
     tool_controls,
     turns,
@@ -484,6 +486,26 @@ def install_agent(app, current, answer, run_model):
                 return await anyio.to_thread.run_sync(
                     store_result, engine, user, pending, result, time.time()
                 )
+            if tool == "data" and body.mode == "auto" and report_request(body.question):
+                stage("plan")
+                selection = await run_model(
+                    choose_plan,
+                    app.state.service,
+                    body.question,
+                    file["payload"]["table"],
+                )
+                if stopped.is_set():
+                    raise HTTPException(409, "หยุดการทำรายงาน / Report cancelled")
+                return await anyio.to_thread.run_sync(
+                    make_report,
+                    engine,
+                    user,
+                    pending,
+                    file,
+                    selection,
+                    stage,
+                    limiter=app.state.file_workers,
+                )
             if tool == "export":
                 last = pending.previous
                 if not last or last.get("status") != "answered":
@@ -508,6 +530,7 @@ def install_agent(app, current, answer, run_model):
                     "cached": False,
                     "trace_id": uuid4().hex,
                     "preferred_format": extension,
+                    "artifact": None,
                     "revision": pending.revision,
                 }
                 return await anyio.to_thread.run_sync(
@@ -740,18 +763,39 @@ def install_agent(app, current, answer, run_model):
 
         def render():
             with app.state.service.engine.connect() as c:
+                stored = turns.outerjoin(
+                    turn_artifacts,
+                    sa.and_(
+                        turn_artifacts.c.conversation == turns.c.conversation,
+                        turn_artifacts.c.turn_id == turns.c.id,
+                        turn_artifacts.c.format == fmt,
+                    ),
+                )
                 row = c.execute(
-                    sa.select(turns.c.question, turns.c.result)
-                    .select_from(turns.join(conversations))
+                    sa.select(
+                        turns.c.question, turns.c.result, turn_artifacts.c.content
+                    )
+                    .select_from(
+                        stored.join(
+                            conversations, turns.c.conversation == conversations.c.id
+                        )
+                    )
                     .where(
                         allowed_threads(user),
                         conversations.c.id == str(conversation_id),
                         turns.c.id == str(turn_id),
                     )
                 ).first()
-            if not row:
-                raise HTTPException(404)
-            return export_turn(fmt, row.question, row.result)
+                if not row:
+                    raise HTTPException(404)
+                asset = row.result.get("artifact")
+                if asset and asset["format"] == fmt:
+                    if row.content is None:
+                        raise HTTPException(404)
+                    return bytes(row.content)
+            return export_turn(
+                fmt, row.result.get("report_title", row.question), row.result
+            )
 
         data = await anyio.to_thread.run_sync(render, limiter=app.state.file_workers)
         return Response(

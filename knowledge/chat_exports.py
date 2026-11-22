@@ -187,6 +187,33 @@ def export_turn(fmt, title, result):
         ] or [answer]
         for i in range(0, len(lines), 7):
             slide(title[:70], lines[i : i + 7])
+        plot = result.get("chart")
+        if plot and plot["points"]:
+            from pptx.chart.data import CategoryChartData
+            from pptx.enum.chart import XL_CHART_TYPE
+
+            heading = f'{plot["metric"]} · {plot["category"]}'
+            if len(plot["points"]) < plot["groups"]:
+                heading += f' (20 / {plot["groups"]})'
+            page = slide(heading, [])
+            series = CategoryChartData()
+            series.categories = [safe_cell(clean(p["label"])) for p in plot["points"]]
+            series.add_series(
+                safe_cell(clean(plot["metric"])), [p["value"] for p in plot["points"]]
+            )
+            chart = page.shapes.add_chart(
+                XL_CHART_TYPE.COLUMN_CLUSTERED,
+                Inches(0.85),
+                Inches(1.45),
+                Inches(11.6),
+                Inches(4.9),
+                series,
+            ).chart
+            chart.has_legend = False
+            chart.value_axis.has_major_gridlines = True
+            chart.value_axis.tick_labels.number_format = "#,##0.##"
+            chart.series[0].format.fill.solid()
+            chart.series[0].format.fill.fore_color.rgb = RGBColor.from_string("347B9A")
         if rows:
             for col in range(0, len(rows[0]), 4):
                 for start in range(1, min(len(rows), 31), 6):

@@ -2,6 +2,10 @@
 let attachedFile = null;
 let activeStream = null;
 const stageLabels = {
+  plan: "เลือกเครื่องมือสำหรับรายงาน / Plan report",
+  aggregate: "รวมยอดจากแถวข้อมูล / Aggregate rows",
+  chart: "สร้างกราฟจากยอดรวม / Build chart",
+  powerpoint: "สร้าง PowerPoint / Generate PowerPoint",
   export: "เตรียมคำตอบที่เลือก / Prepare previous answer",
   access: "ตรวจสิทธิ์ / Check access",
   file: "เปิดไฟล์แนบ / Open attachment",
@@ -14,7 +18,7 @@ const stageLabels = {
   case_status: "ตรวจเคสของบัญชีนี้ / Read your cases",
 };
 const toolHints = {
-  auto: "ถามจากคลังองค์กร หรือแนบไฟล์เพื่อถามเฉพาะไฟล์นั้น / Ask about company documents or an attached file.",
+  auto: "แนบ Excel แล้วขอสรุปยอด ทำกราฟ และสร้าง PowerPoint ได้ในข้อความเดียว โมเดลที่ตั้งค่าไว้จะได้รับคำขอและชื่อคอลัมน์ / For reports, your request and column names go to the configured model.",
   attachment:
     "แนบไฟล์แล้วถาม หรือพิมพ์ “สรุป” เพื่อดูข้อความตัวอย่าง / Ask about the file or enter “preview”.",
   data: "แนบ CSV หรือ Excel แล้วพิมพ์ “แสดงตาราง” / Attach a spreadsheet and enter “show table”.",
@@ -219,6 +223,7 @@ function responseActions(chat, turn, result) {
       "/export/" +
       format.value;
     link.download = "answer." + format.value;
+    if (result.artifact) link.textContent = format.value===result.artifact.format ? "ดาวน์โหลด PowerPoint / Download slides" : "ดาวน์โหลด / Download";
   };
   format.onchange = update;
   update();

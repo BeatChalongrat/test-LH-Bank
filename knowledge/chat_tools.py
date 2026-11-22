@@ -19,7 +19,7 @@ import anyio
 import sqlalchemy as sa
 from fastapi import Depends, HTTPException, Request
 
-from .db import chat_files, events
+from .db import chat_files, events, turn_artifacts
 from .document_worker import extract
 from .file_formats import FORMATS, MAX_XML
 from .security import normalize
@@ -289,9 +289,18 @@ def private_result(engine, user, pending, tool, question, file, lang):
     return store_result(engine, user, pending, result, stamp)
 
 
-def store_result(engine, user, pending, result, started):
+def store_result(engine, user, pending, result, started, artifact=None):
     with engine.begin() as c:
         pending.complete(c, result)
+        if artifact is not None:
+            c.execute(
+                turn_artifacts.insert().values(
+                    conversation=pending.conversation,
+                    turn_id=pending.turn,
+                    format=result["artifact"]["format"],
+                    content=artifact,
+                )
+            )
         c.execute(
             events.insert().values(
                 trace=result["trace_id"],

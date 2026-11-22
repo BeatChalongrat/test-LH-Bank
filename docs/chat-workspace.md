@@ -20,6 +20,22 @@ In Admin, connect a document search model and a chat model. Save, test and activ
 | ตรวจเคส / Check cases | เลือก **เคสของฉัน / My cases** แล้วถาม ระบบตรวจรายการที่บัญชีนั้นอ่านได้ |
 | ส่งออก / Download | ใต้คำตอบเลือก PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), CSV หรือ Markdown แล้วกด **ดาวน์โหลด / Download** หรือพิมพ์ “ส่งออกเป็น PDF” ต่อจากคำตอบในโหมด Ask |
 
+### รายงานจาก Excel ในข้อความเดียว / One-turn spreadsheet report
+
+ในโหมด **ถามผู้ช่วย / Ask** แนบ Excel แล้วพิมพ์ “ช่วยสรุปยอดขาย ทำกราฟ แล้วทำเป็น PowerPoint ให้หน่อย” แชตจะแสดงยอดรวม กราฟ และปุ่ม **ดาวน์โหลด PowerPoint** โมเดลที่เลือกใน Admin ได้รับคำขอกับชื่อและชนิดคอลัมน์เพื่อเลือกเครื่องมือ การรวมยอดและการสร้างไฟล์เกิดขึ้นบนเซิร์ฟเวอร์ของพอร์ทัล ถ้ายังไม่ได้เชื่อมโมเดล ระบบใช้กฎสำหรับคำขอที่ชัดเจน และแสดงวิธีที่ใช้ใน **ที่มาและขั้นตอน**
+
+รายงานใช้ข้อมูลชีตแรกและคอลัมน์ตัวเลขหนึ่งคอลัมน์ โดยรวมตามกลุ่ม เช่น เดือน ตัวเลขติดลบหักจากยอดรวม ระบบข้ามยอดว่างและแถวที่มีป้ายรวมที่รู้จัก เช่น “รวม” และ “Grand total” สำหรับเซลล์สูตร ให้บันทึกไฟล์จาก Excel ที่คำนวณค่าแล้ว กราฟแสดงกลุ่มตามลำดับที่พบสูงสุด 20 กลุ่ม ยอดรวมครอบคลุมทุกกลุ่ม สไลด์มีกราฟ PowerPoint ที่แก้ไขได้ และดาวน์โหลดภายใต้สิทธิ์ของบทสนทนาเดิม
+
+**ทดสอบผ่าน HTTP API** หลังตั้งค่าบัญชีสาธิต HR ให้รันจากเครื่องที่ติดตั้ง dependencies ของโปรเจกต์แล้ว
+
+```shell
+python scripts/test_sales_report_api.py
+```
+
+สคริปต์สร้าง Excel ตัวอย่าง ส่งไฟล์ด้วย `POST /api/conversations/{id}/attachments` และส่งคำถามเพียงครั้งเดียวด้วย `POST /api/conversations/{id}/stream` โดยระบุ `turn_id`, `attachment_id` และ `question` ผลลัพธ์มี `planner`, `selected_tools`, `summary`, `chart` และ `artifact.url` สคริปต์ดาวน์โหลดไฟล์ผ่าน URL นั้น เปิดอ่านค่าของกราฟใน PowerPoint แล้วเทียบกับยอดคาดหมาย เก็บ Excel, PowerPoint และผลตรวจ `receipt.json` ใน `var/sales-report-demo/`
+
+การทดสอบปกติต้องได้ `planner=model` หากต้องการทดสอบพอร์ทัลที่ยังไม่มีโมเดล ให้ใช้ `--expect-planner built_in` สำหรับระบบอื่นให้กำหนด bearer token พนักงานในตัวแปรสภาพแวดล้อม `DESK_TEST_TOKEN` และส่ง `--base-url` ของระบบที่ต้องการทดสอบ
+
 **ไฟล์แนบ** รองรับ PDF, DOCX, PPTX, XLSX, TXT, Markdown และ CSV ขนาดสูงสุด 5 MiB ต่อไฟล์ เลือกใช้ครั้งละหนึ่งไฟล์ต่อข้อความ ตารางใช้ชีตแรก สูงสุด 500 แถวข้อมูลและ 16 คอลัมน์ กราฟแสดงได้ถึง 20 แถวแรก สไลด์แสดงตัวอย่างตารางถึง 30 แถว การคำนวณใช้ชุดสูตรที่กำหนดในกระบวนการแยกพร้อมจำกัดเวลา
 
 **Privacy and processing.** Private attachments are scoped to the signed-in account, role and conversation. Document search and calculator tools can process an attachment without a chat provider. Choosing Draft sends the brief, up to 10,000 characters of extracted reference text and, for revisions, up to 4,000 characters of the preceding draft to the configured provider. The title feature sends the redacted opening question after the first successful reply. When naming is unavailable, the opening question is used as the title.

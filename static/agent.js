@@ -46,6 +46,7 @@ function renderTurn(question, r, chat, turnId, steps = []) {
         : r.tool === "case_status"
           ? "สถานะจากระบบงาน"
           : {
+              sheet_report: "รายงานจากไฟล์แนบ / Spreadsheet report",
               export: "พร้อมดาวน์โหลด / Ready to export",
               draft: "ร่างเอกสาร / Draft",
               calculator: "ผลคำนวณ / Calculation",
@@ -81,6 +82,7 @@ function renderTurn(question, r, chat, turnId, steps = []) {
     el("summary", "ที่มาและขั้นตอน / Sources & steps"),
     el("small", "Trace ID · " + r.trace_id, "meta"),
   );
+  if (r.planner) info.append(el("p",r.planner==="model" ? "โมเดลเลือกเครื่องมือ / Model-selected tools" : "ใช้กฎพื้นฐาน ยังไม่ได้เชื่อมโมเดล / Built-in rules, no chat model configured","meta"));
   const usedStages = r.steps || steps;
   if (usedStages.length)
     info.append(
