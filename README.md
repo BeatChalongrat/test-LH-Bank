@@ -1,5 +1,7 @@
 # Enterprise Knowledge & Support Agent
 
+[คู่มือหน้า Admin และแชต / Chat and admin guide](docs/chat-workspace.md) · แนบไฟล์ส่วนตัว ดูตารางและกราฟ คำนวณ ร่างเอกสาร และดาวน์โหลดคำตอบเป็น PDF หรือไฟล์ Office
+
 **เริ่มใช้งานด้วย Model API** ตั้งค่าโมเดลและคีย์ในหน้า Admin ได้ทั้ง OpenAI, Anthropic Claude, Gemini, Groq, OpenRouter และ gateway ขององค์กร การติดตั้งใหม่ใช้ `python scripts/configure.py --admin-providers` แล้วเปิด Compose ตามคู่มือ โหมดนี้เรียกทั้ง embeddings และ chat ผ่าน API โดยไม่ต้องโหลดโมเดล [ติดตั้งและตั้งค่า API](docs/provider.md) · [ผลทดสอบคิวของโหมด API](evaluation/provider-capacity.md)
 
 บริการค้นความรู้ภายในองค์กรภาษาไทย มีหน้าเว็บและ HTTP API อ่านนโยบายจาก PDF และข้อความแชต ค้นด้วยเวกเตอร์ ตรวจสิทธิ์ก่อนค้น ให้โมเดลเลือกหลักฐาน และให้พนักงานติดตามคำถามที่ส่งไปหาเจ้าหน้าที่ได้ ข้อมูลตัวอย่างทั้ง 8 เอกสารเป็นข้อมูลสมมติ การยืนยันตัวตน ฐานข้อมูล โมเดล OCR แคช คิวงาน และ monitoring ทำงานจริงบนเครื่องผู้ใช้

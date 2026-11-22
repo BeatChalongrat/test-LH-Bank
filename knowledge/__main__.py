@@ -15,6 +15,7 @@ from .db import (
     cache,
     chunks,
     conversations,
+    chat_files,
     department_members,
     doc_grants,
     engine_for,
@@ -168,6 +169,7 @@ def main():
     elif args.action == "prune":
         with engine.begin() as conn:
             now = time.time()
+            conn.execute(chat_files.delete().where(chat_files.c.created < now - 30 * 86400))
             conn.execute(
                 conversations.delete().where(conversations.c.updated < now - 30 * 86400)
             )

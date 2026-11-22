@@ -83,6 +83,17 @@ conversations = sa.Table(
     C("lease", T),
     C("lease_end", sa.Float, nullable=False),
 )
+chat_files = sa.Table(
+    "private_chat_files",
+    meta,
+    C("id", T, primary_key=True),
+    C("chat", T, nullable=False, index=True),
+    C("subject", T, nullable=False, index=True),
+    C("role", T, nullable=False),
+    C("name", T, nullable=False),
+    C("created", sa.Float, nullable=False, index=True),
+    C("payload", sa.JSON, nullable=False),
+)
 turns = sa.Table(
     "conversation_turns",
     meta,
@@ -366,7 +377,7 @@ def initialize(engine):
             )
             conn.execute(
                 sa.text(
-                    "GRANT SELECT,INSERT ON conversation_turns,tool_changes TO desk_web"
+                    "GRANT SELECT,INSERT ON private_chat_files,conversation_turns,tool_changes TO desk_web"
                 )
             )
             conn.execute(

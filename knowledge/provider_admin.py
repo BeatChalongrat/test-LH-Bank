@@ -81,6 +81,8 @@ def install_providers(app, current):
             "profiles": entries,
             "routes": active,
             "indexed": bool(indexed),
+            "chat_configured": getattr(app.state.service.generator, "url", "")
+            not in {"", "https://unconfigured.invalid/v1"},
             "embedding_mode": os.getenv("EMBEDDING_MODE", "local"),
         }
 

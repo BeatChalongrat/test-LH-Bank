@@ -1,9 +1,9 @@
 "use strict";
 const docRoles = {
-  employee: "พนักงาน",
-  reviewer: "เจ้าหน้าที่สนับสนุน",
-  executive: "ผู้บริหาร",
-  admin: "ผู้ดูแล AI",
+  employee: "พนักงาน / Employee",
+  reviewer: "ฝ่ายสนับสนุน / Support",
+  executive: "ผู้บริหาร / Executive",
+  admin: "ผู้ดูแล / Admin",
 };
 const uploadErrors = {
   encrypted_pdf: "PDF มีการเข้ารหัส กรุณาอัปโหลดฉบับที่เปิดอ่านได้",
@@ -16,7 +16,7 @@ const uploadErrors = {
     "อ่านไฟล์ไม่ได้ กรุณาตรวจชนิดไฟล์ การเข้ารหัส และความชัดของหน้าสแกน",
   file_limit: "ขนาดเนื้อหาภายในไฟล์เกินขีดจำกัด",
   processing_timeout: "อ่านไฟล์เกินเวลาที่กำหนด กรุณาแบ่งไฟล์เป็นส่วน",
-  index_failed: "ทำดัชนีไม่สำเร็จ กรุณาให้ผู้ดูแลระบบตรวจบันทึกของ indexer",
+  index_failed: "เตรียมเอกสารไม่สำเร็จ / Processing failed กรุณาให้ผู้ดูแลระบบตรวจบันทึกของ indexer",
 };
 const documentPageSize = 30;
 let documentOffset = 0;
@@ -85,10 +85,10 @@ function documentRow(doc) {
   const article = el("article", undefined, "managed-doc");
   const header = el("div", undefined, "managed-doc-title");
   const states = {
-    queued: "รอทำดัชนี",
-    indexing: "กำลังทำดัชนี",
-    ready: doc.enabled ? "พร้อมใช้ในแชต" : "ปิดการเผยแพร่",
-    failed: "ทำดัชนีไม่สำเร็จ",
+    queued: "รอเตรียมเอกสาร / Queued",
+    indexing: "กำลังเตรียมเอกสาร / Preparing",
+    ready: doc.enabled ? "ถามในแชตได้แล้ว / Ready" : "ปิดการเผยแพร่ / Unpublished",
+    failed: "เตรียมเอกสารไม่สำเร็จ / Processing failed",
   };
   const status = el(
     "span",
@@ -123,7 +123,7 @@ function documentRow(doc) {
         "อัปเดต " + date(doc.updated) + " · " + idName(doc.actor),
         "meta",
       ),
-      button("แก้ไขสิทธิ์", () => editDocument(doc)),
+      button("แก้ไขสิทธิ์ / Edit access", () => editDocument(doc)),
     );
     article.append(footer);
   }
@@ -141,7 +141,7 @@ async function loadDocuments(seq = epoch) {
     $("managed-list").replaceChildren(
       ...(rows.length
         ? rows.map(documentRow)
-        : [empty("ยังไม่มีเอกสารที่อัปโหลด")]),
+        : [empty("ยังไม่มีเอกสาร / No uploaded documents")]),
     );
     $("documents-prev").hidden = !documentOffset;
     $("documents-next").hidden = docs.length <= documentPageSize;
@@ -177,7 +177,7 @@ $("pdf-upload").onsubmit = async (event) => {
     file = $("pdf-file").files[0],
     readers = readersOf(form);
   if (!hasReaders(readers)) {
-    status.textContent = "กรุณาเลือกบทบาท แผนก หรือบัญชีอย่างน้อยหนึ่งรายการ";
+    status.textContent = "เลือกผู้ที่เห็นเอกสารอย่างน้อยหนึ่งรายการ / Select at least one reader or group";
     return;
   }
   if (
@@ -185,7 +185,7 @@ $("pdf-upload").onsubmit = async (event) => {
     !/[.](pdf|docx|xlsx|pptx|txt|md|csv)$/i.test(file.name) ||
     file.size > 15 * 1024 * 1024
   ) {
-    status.textContent = "กรุณาเลือกชนิดไฟล์ที่รองรับ ขนาดไม่เกิน 15 MB";
+    status.textContent = "เลือกไฟล์ที่รองรับ ขนาดสูงสุด 15 MB / Choose a supported file up to 15 MB";
     return;
   }
   const metadata = {
@@ -196,7 +196,7 @@ $("pdf-upload").onsubmit = async (event) => {
   };
   const subject = me?.subject;
   submit.disabled = true;
-  status.textContent = "กำลังอัปโหลดไฟล์…";
+  status.textContent = "กำลังอัปโหลด / Uploading…";
   try {
     const response = await fetch("/api/admin/documents", {
       method: "POST",
@@ -219,7 +219,7 @@ $("pdf-upload").onsubmit = async (event) => {
     if (me?.subject !== subject) return;
     form.reset();
     readerFields.get(form).reset();
-    status.textContent = "รับไฟล์แล้ว ตรวจสถานะการทำดัชนีได้ในรายการเอกสาร";
+    status.textContent = "รับไฟล์แล้ว ดูสถานะในรายการเอกสาร / Uploaded. Check document status below.";
     documentOffset = 0;
     await loadDocuments();
   } catch (err) {
@@ -237,7 +237,7 @@ $("document-access").onsubmit = async (event) => {
   const readers = readersOf(form),
     submit = form.querySelector("button[type=submit]");
   if (!hasReaders(readers)) {
-    status.textContent = "กรุณาเลือกบทบาท แผนก หรือบัญชีอย่างน้อยหนึ่งรายการ";
+    status.textContent = "เลือกผู้ที่เห็นเอกสารอย่างน้อยหนึ่งรายการ / Select at least one reader or group";
     return;
   }
   submit.disabled = true;

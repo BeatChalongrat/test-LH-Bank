@@ -21,7 +21,7 @@ for (const container of document.querySelectorAll(".scoped-readers")) {
   query.type = "search";
   query.maxLength = 260;
   query.setAttribute("aria-label", "ค้นหาบัญชีที่จะให้สิทธิ์");
-  query.placeholder = "ชื่อหรือรหัสบัญชี";
+  query.placeholder = "ชื่อหรือรหัสบัญชี / Name or ID";
   const selected = el("div", undefined, "selected-accounts");
   const results = el("div", undefined, "identity-results");
   const entries = new Map();
@@ -66,7 +66,7 @@ for (const container of document.querySelectorAll(".scoped-readers")) {
           ),
         ),
       );
-      if (!accounts.length) results.append(el("p", "ไม่พบบัญชี", "meta"));
+      if (!accounts.length) results.append(el("p", "ไม่พบบัญชี / No matching account", "meta"));
     } catch (error) {
       if (run === searchRun)
         results.replaceChildren(el("p", error.message, "meta"));
@@ -78,8 +78,8 @@ for (const container of document.querySelectorAll(".scoped-readers")) {
       search();
     }
   });
-  row.append(query, button("ค้นหา", search));
-  people.append(el("legend", "สิทธิ์รายบุคคล"), row, selected, results);
+  row.append(query, button("ค้นหา / Search", search));
+  people.append(el("legend", "ระบุรายคน / People"), row, selected, results);
   container.append(departments, people);
   readerFields.set(container.closest("form"), {
     departments,
@@ -103,7 +103,7 @@ function renderDepartmentFields() {
         (input) => input.value,
       ),
     );
-    field.departments.replaceChildren(el("legend", "สิทธิ์รายแผนก"));
+    field.departments.replaceChildren(el("legend", "เลือกแผนก / Departments"));
     for (const dept of departmentList) {
       const label = el("label"),
         check = el("input");
@@ -125,7 +125,7 @@ function renderDepartmentFields() {
   const chooser = $("membership-department"),
     current = chooser.value;
   chooser.replaceChildren(
-    new Option("เลือกแผนก", ""),
+    new Option("เลือกแผนก / Choose department", ""),
     ...departmentList.map((dept) => new Option(dept.name, dept.code)),
   );
   chooser.value = departmentList.some((dept) => dept.code === current)
@@ -171,7 +171,7 @@ async function loadMembers() {
     for (const account of people) {
       const row = el("div", undefined, "member-row");
       const change = button(
-        account.member ? "นำออก" : "เพิ่มเข้าแผนก",
+        account.member ? "นำออก / Remove" : "เพิ่มเข้าแผนก / Add member",
         async () => {
           change.disabled = true;
           try {
@@ -181,7 +181,7 @@ async function loadMembers() {
                 "/membership",
               { subject: account.subject, member: !account.member },
             );
-            status.textContent = "บันทึกสมาชิกแผนกแล้ว";
+            status.textContent = "บันทึกแล้ว / Membership saved";
             await loadMembers();
           } catch (error) {
             status.textContent = error.message;
@@ -194,7 +194,7 @@ async function loadMembers() {
     }
     if (!people.length)
       root.append(
-        el("p", term ? "ไม่พบบัญชี" : "ยังไม่มีสมาชิกในแผนก", "meta"),
+        el("p", term ? "ไม่พบบัญชี / No matching account" : "ยังไม่มีสมาชิก / No members", "meta"),
       );
   } catch (error) {
     if (run === identityRequest) status.textContent = error.message;
@@ -229,7 +229,7 @@ $("department-create").onsubmit = async (event) => {
     form.reset();
     await refreshDepartments();
     $("membership-department").value = row.code;
-    $("department-status").textContent = "เพิ่มแผนกแล้ว";
+    $("department-status").textContent = "เพิ่มแผนกแล้ว / Department added";
     await loadMembers();
   } catch (error) {
     $("department-status").textContent =

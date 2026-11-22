@@ -7,7 +7,14 @@ let chatId = null,
 const chatStorage = () => me && "folio.chat." + me.subject + "." + me.role;
 function busyChat(value) {
   sending = value;
-  for (const name of ["submitq", "question", "new-chat"])
+  for (const name of [
+    "submitq",
+    "question",
+    "new-chat",
+    "chat-mode",
+    "pick-chat-file",
+    "chat-file-chip",
+  ])
     $(name).disabled = value;
   for (const b of document.querySelectorAll(
     "#chat-history button, [data-prompt]",
@@ -17,13 +24,14 @@ function busyChat(value) {
 function resetChat() {
   if (me) sessionStorage.removeItem(chatStorage());
   chatVersion++;
+  clearChatTools();
   chatId = lastTurn = retry = null;
   $("result").replaceChildren();
   markCurrentChat();
   $("question").value = $("chat-progress").textContent = "";
   busyChat(false);
 }
-function renderTurn(question, r) {
+function renderTurn(question, r, chat, turnId, steps = []) {
   const turn = el("article", undefined, "chat-turn"),
     user = el("div", undefined, "user-message"),
     reply = el("div", undefined, "agent-message");
@@ -37,7 +45,13 @@ function renderTurn(question, r) {
         ? "แจ้งจากผู้ช่วย"
         : r.tool === "case_status"
           ? "สถานะจากระบบงาน"
-          : "คำตอบจากเอกสาร";
+          : {
+              export: "พร้อมดาวน์โหลด / Ready to export",
+              draft: "ร่างเอกสาร / Draft",
+              calculator: "ผลคำนวณ / Calculation",
+              data: "ข้อมูลในไฟล์ / File data",
+              attachment: "ข้อความในไฟล์ / File passages",
+            }[r.tool] || "คำตอบจากเอกสาร";
   reply.append(el("strong", label), el("p", r.answer, "answer"));
   if (r.used_context)
     reply.append(
@@ -45,7 +59,7 @@ function renderTurn(question, r) {
         "small",
         r.tool === "case_status"
           ? "ใช้เลขเคสจากคำตอบก่อนหน้า"
-          : "ใช้หัวข้อจากคำตอบก่อนหน้า",
+          : "ใช้คำตอบก่อนหน้า / Used previous response",
         "meta",
       ),
     );
@@ -64,10 +78,24 @@ function renderTurn(question, r) {
   if (r.ticket_id) reply.append(button("ติดตามรายการ", () => go("queue")));
   const info = el("details", undefined, "trace");
   info.append(
-    el("summary", "รายละเอียดการตอบ"),
+    el("summary", "ที่มาและขั้นตอน / Sources & steps"),
     el("small", "Trace ID · " + r.trace_id, "meta"),
   );
+  const usedStages = r.steps || steps;
+  if (usedStages.length)
+    info.append(
+      el(
+        "p",
+        usedStages
+          .map((code) => stageLabels[code])
+          .filter(Boolean)
+          .join(" → "),
+        "meta",
+      ),
+    );
+  if (r.table) reply.append(renderDataset(r));
   reply.append(info);
+  if (chat && turnId) reply.append(responseActions(chat, turnId, r));
   turn.append(user, reply);
   return turn;
 }
@@ -93,6 +121,7 @@ function historyButton(row) {
 }
 async function openChat(id, seq) {
   const version = ++chatVersion;
+  clearChatTools();
   busyChat(true);
   $("chat-progress").textContent = "กำลังเปิดบทสนทนา…";
   try {
@@ -103,8 +132,10 @@ async function openChat(id, seq) {
     retry = null;
     sessionStorage.setItem(chatStorage(), id);
     $("result").replaceChildren(
-      ...rows.map((r) => renderTurn(r.question, r.result)),
+      ...rows.map((r) => renderTurn(r.question, r.result, id, r.id)),
     );
+    attachedFile = rows.at(-1)?.result.attachment || null;
+    updateTool();
     markCurrentChat();
     $("result").scrollTop = $("result").scrollHeight;
     $("chat-progress").textContent = "";
@@ -141,19 +172,48 @@ async function sendChat() {
   if (sending || question.length < 2) return;
   const subject = me.subject,
     version = ++chatVersion;
-  if (!retry || retry.question !== question)
+  const mode = $("chat-mode").value,
+    file = attachedFile?.id || null;
+  if (
+    !retry ||
+    retry.question !== question ||
+    retry.mode !== mode ||
+    retry.attachment_id !== file
+  )
     retry = {
       chat: chatId || crypto.randomUUID(),
       turn_id: crypto.randomUUID(),
       parent_id: lastTurn,
+      mode,
+      attachment_id: file,
       question,
     };
   const { chat, ...payload } = retry;
   busyChat(true);
   message("");
-  $("chat-progress").textContent = "กำลังตรวจสอบข้อมูล…";
+  const controller = new AbortController();
+  activeStream = controller;
+  $("stop-chat").hidden = false;
+  const draft = el("article", undefined, "chat-turn");
+  const userBox = el("div", undefined, "user-message");
+  userBox.append(el("small", "คุณ / You", "meta"), el("p", question));
+  const live = el("div", undefined, "agent-message"),
+    text = el("p", "", "answer");
+  live.append(text);
+  draft.append(userBox, live);
+  $("result").append(draft);
+  const steps = [];
   try {
-    const r = await api("/api/conversations/" + chat + "/messages", payload);
+    const r = await streamReply(chat, payload, controller.signal, (frame) => {
+      if (version !== chatVersion) return;
+      if (frame.event === "delta")
+        text.append(document.createTextNode(frame.value));
+      if (frame.event === "stage") {
+        steps.push(frame.value);
+        $("chat-progress").textContent = stageLabels[frame.value] || "";
+      }
+      $("result").scrollTop = $("result").scrollHeight;
+    });
     if (version !== chatVersion || me?.subject !== subject) return;
     chatId = chat;
     lastTurn = payload.turn_id;
@@ -169,8 +229,21 @@ async function sendChat() {
     );
     if (historyList.children.length > 50) historyList.lastElementChild.remove();
     markCurrentChat();
-    const node = renderTurn(question, r);
-    $("result").append(node);
+    const node = renderTurn(question, r, chat, lastTurn, steps);
+    draft.replaceWith(node);
+    if (!payload.parent_id)
+      api("/api/conversations/" + chat + "/title", {})
+        .then(({ title }) => {
+          if (me?.subject !== subject) return;
+          const item = Array.from(
+            $("chat-history").querySelectorAll("button"),
+          ).find((b) => b.dataset.id === chat);
+          if (item) {
+            item.title = title;
+            item.querySelector("span").textContent = title;
+          }
+        })
+        .catch(() => {});
     $("question").value = "";
     $("chat-progress").textContent = "";
     if (view === "ask") {
@@ -179,11 +252,18 @@ async function sendChat() {
   } catch (err) {
     if (version === chatVersion && me?.subject === subject) {
       $("chat-progress").textContent =
-        err.status === 409
-          ? "บทสนทนามีการเปลี่ยนแปลง กรุณาเปิดประวัติอีกครั้ง"
-          : err.message;
+        err.name === "AbortError"
+          ? "หยุดแล้ว / Stopped"
+          : err.status === 409
+            ? "บทสนทนามีการเปลี่ยนแปลง กรุณาเปิดประวัติอีกครั้ง"
+            : err.message;
     }
   } finally {
+    draft.remove();
+    if (activeStream === controller) {
+      activeStream = null;
+      $("stop-chat").hidden = true;
+    }
     if (version === chatVersion) busyChat(false);
   }
 }
@@ -193,6 +273,9 @@ $("query").onsubmit = (e) => {
 };
 for (const b of document.querySelectorAll("[data-prompt]"))
   b.onclick = () => {
+    attachedFile = null;
+    $("chat-mode").value = "auto";
+    updateTool();
     $("question").value = b.dataset.prompt;
     $("query").requestSubmit();
   };
@@ -203,17 +286,25 @@ function adminCard(title) {
 }
 async function showAdmin(seq) {
   const root = $("admin-content");
+  const permitted = me?.role === "admin";
+  $("admin-steps").hidden = $("admin-operations").hidden = !permitted;
+  $("admin-gate").textContent = permitted
+    ? ""
+    : "เฉพาะผู้ดูแล / Admin access required";
   $("admin-providers").hidden = me?.role !== "admin";
   $("admin-documents").hidden = me?.role !== "admin";
   if (!me) {
-    root.replaceChildren(gated("เข้าสู่ระบบด้วยบัญชีผู้ดูแล AI"));
+    $("admin-gate").replaceChildren(gated("เข้าสู่ระบบด้วยบัญชีผู้ดูแล / Sign in as an admin"));
     return;
   }
   if (me.role !== "admin") {
     root.replaceChildren(empty("บัญชีนี้ไม่มีสิทธิ์เปิดหน้าผู้ดูแล AI"));
     return;
   }
-  loadProviders(seq).catch((error) => { if (seq === epoch) $("provider-result").textContent = error.message; });
+  $("provider-add").disabled = true;
+  loadProviders(seq).catch((error) => {
+    if (seq === epoch) $("provider-result").textContent = error.message;
+  });
   root.replaceChildren(empty("กำลังโหลด…"));
   refreshDepartments()
     .then(() => loadDocuments(seq))
@@ -222,33 +313,35 @@ async function showAdmin(seq) {
     });
   const data = await api("/api/admin/agent");
   if (seq !== epoch) return;
-  const stats = adminCard("ผลการตอบใน 24 ชั่วโมง"),
+  const stats = adminCard("ผลการตอบใน 24 ชั่วโมง / Last 24 hours"),
     grid = el("div", undefined, "admin-stats");
   for (const [key, label] of [
-    ["answered", "ตอบได้"],
-    ["fallback", "ส่งต่อ"],
-    ["refused", "ปฏิเสธ"],
+    ["answered", "ตอบได้ / Answered"],
+    ["fallback", "ส่งต่อ / Referred"],
+    ["refused", "ปฏิเสธ / Declined"],
   ]) {
     const cell = el("div");
     cell.append(el("strong", String(data.counts[key] || 0)), el("span", label));
     grid.append(cell);
   }
   stats.append(grid);
-  const model = adminCard("โมเดลและดัชนี"),
+  const model = adminCard("การตั้งค่าทางเทคนิค / Technical settings"),
     list = el("dl", undefined, "admin-list");
   for (const [label, value] of [
-    ["โมเดล", data.model],
-    ["การเชื่อมต่อ", data.protocol],
-    ["รุ่นโมเดล", data.model_revision],
-    ["เกณฑ์คะแนนค้นคืน", data.threshold],
-    ["รุ่นดัชนี", data.revision],
+    ["โมเดล / Model", data.model],
+    ["การเชื่อมต่อ / Connection", data.protocol],
+    ["รุ่นโมเดล / Version", data.model_revision],
+    ["คะแนนขั้นต่ำที่ใช้ตอบ / Minimum evidence score", data.threshold],
+    ["ชุดเอกสารที่ใช้อยู่ / Library version", data.revision],
   ])
     list.append(el("dt", label), el("dd", String(value || "—")));
   model.append(list);
   const tool = adminCard("เครื่องมือตรวจเคส"),
     state = data.case_status;
   const toggle = button(
-    state.enabled ? "ปิดเครื่องมือตรวจเคส" : "เปิดเครื่องมือตรวจเคส",
+    state.enabled
+      ? "ปิดการตรวจเคส / Disable lookup"
+      : "เปิดการตรวจเคส / Enable lookup",
     async () => {
       toggle.disabled = true;
       try {
@@ -269,12 +362,12 @@ async function showAdmin(seq) {
     el(
       "p",
       state.enabled
-        ? "พนักงานตรวจเคสของตนเองผ่านแชตได้"
-        : "ปิดการตรวจเคสผ่านแชตอยู่",
+        ? "พนักงานดูเคสของตัวเองในแชตได้ / Employees can check their cases in chat"
+        : "ปิดการตรวจเคสในแชต / Case lookup is off",
     ),
     toggle,
   );
-  const audit = adminCard("ประวัติการตั้งค่า");
+  const audit = adminCard("ประวัติการตั้งค่า / Change history");
   for (const change of data.changes)
     audit.append(
       el(
@@ -287,12 +380,16 @@ async function showAdmin(seq) {
       ),
     );
   if (!data.changes.length)
-    audit.append(el("p", "ยังไม่มีการเปลี่ยนแปลง", "muted"));
-  const reasons = adminCard("สาเหตุที่บันทึกใน 24 ชั่วโมง");
+    audit.append(el("p", "ยังไม่มีการเปลี่ยนแปลง / No changes", "muted"));
+  const reasons = adminCard("เหตุผลของคำตอบ / Response reasons");
   for (const item of data.reasons)
     reasons.append(el("p", item.reason + " · " + item.count));
-  if (!data.reasons.length) reasons.append(el("p", "ยังไม่มีรายการ", "muted"));
+  if (!data.reasons.length)
+    reasons.append(el("p", "ยังไม่มีรายการ / No entries", "muted"));
   root.replaceChildren(stats, model, tool, audit, reasons);
 }
 $("admin-refresh").onclick = () => show("admin");
+$("step-connect").onclick = () => $("provider-add").focus();
+$("step-upload").onclick = () => $("pdf-file").focus();
+$("step-test").onclick = () => go("ask");
 boot();

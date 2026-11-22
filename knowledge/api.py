@@ -75,6 +75,7 @@ def create_app(service=None):
             int(os.getenv("RETRIEVAL_IN_FLIGHT", "16"))
         )
         app.state.lookup_gate = anyio.Semaphore(app.state.lookup_workers.total_tokens)
+        app.state.file_workers = anyio.CapacityLimiter(3)
         app.state.model_workers = anyio.CapacityLimiter(in_flight)
         app.state.inference_wait = float(os.getenv("INFERENCE_QUEUE_TIMEOUT", "8"))
         if not math.isfinite(app.state.inference_wait) or app.state.inference_wait <= 0:
@@ -159,7 +160,9 @@ def create_app(service=None):
     def me(user=Depends(current)):
         return {"subject": user.subject, "role": user.role}
 
-    async def answer(user, question, on_commit=None, original_question=None):
+    async def answer(
+        user, question, on_commit=None, original_question=None, progress=None
+    ):
         service = app.state.service
         finish = (
             partial(
@@ -174,6 +177,8 @@ def create_app(service=None):
             raise HTTPException(503, "กรุณาตั้งค่า embeddings และรอจัดทำดัชนี") from None
         if not request.needs_inference:
             return await anyio.to_thread.run_sync(finish, user, question, request)
+        if progress:
+            progress("lookup")
         evidence, lookup_wait = await run_stage(
             app.state.lookup_gate,
             app.state.lookup_workers,
@@ -188,6 +193,8 @@ def create_app(service=None):
         evidence.timings["lookup_admission_ms"] = round(lookup_wait, 2)
         selected, queue_ms, overloaded = None, 0.0, False
         if evidence.choices:
+            if progress:
+                progress("select")
             selected, queue_ms = await run_stage(
                 app.state.inference_gate,
                 app.state.model_workers,
@@ -208,7 +215,21 @@ def create_app(service=None):
         return await answer(user, body.question)
 
     install_providers(app, current)
-    install_agent(app, current, answer)
+
+    async def run_model(fn, *args):
+        result, _ = await run_stage(
+            app.state.inference_gate,
+            app.state.model_workers,
+            app.state.inference_wait,
+            app.state.inference_backlog,
+            fn,
+            *args,
+        )
+        if result is None:
+            raise HTTPException(503, "โมเดลมีงานเต็ม · Chat model is busy")
+        return result
+
+    install_agent(app, current, answer, run_model)
     install_documents(app, current)
     install_workspace(app, current)
 

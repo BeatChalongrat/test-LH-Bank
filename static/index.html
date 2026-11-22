@@ -11,6 +11,7 @@
     <script defer src="/static/directory.js"></script>
     <script defer src="/static/documents.js"></script>
     <script defer src="/static/providers.js"></script>
+    <script defer src="/static/chat-workspace.js"></script>
     <script defer src="/static/agent.js"></script>
   </head>
   <body>
@@ -157,6 +158,22 @@
               aria-label="ข้อความในบทสนทนา"
             ></div>
             <div class="composer-area">
+              <div class="chat-toolbar">
+                <label for="chat-mode" class="sr">เครื่องมือ / Tool</label>
+                <select id="chat-mode">
+                  <option value="auto">ถามผู้ช่วย / Ask</option>
+                  <option value="attachment">อ่านไฟล์แนบ / Read file</option>
+                  <option value="data">ตารางและกราฟ / Data</option>
+                  <option value="calculator">คำนวณ / Calculate</option>
+                  <option value="draft">ร่างเอกสาร / Draft</option>
+                  <option value="case_status">เคสของฉัน / My cases</option>
+                </select>
+                <button type="button" class="outline" id="pick-chat-file"><i data-icon="upload"></i>แนบไฟล์ / Attach</button>
+                <input id="chat-file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.csv,.md,.txt" hidden>
+                <button type="button" class="account-chip" id="chat-file-chip" aria-label="นำไฟล์แนบออก / Remove attachment" hidden></button>
+                <button type="button" class="outline" id="stop-chat" hidden>หยุด / Stop</button>
+              </div>
+              <p class="meta tool-hint" id="tool-hint"></p>
               <form id="query" class="searchbar">
                 <label class="sr" for="question">ถามผู้ช่วย AI</label>
                 <input
@@ -243,33 +260,38 @@
         </section>
         <section id="admin" class="subpage" hidden>
           <div class="section-head page-heading">
-            <h1>ผู้ดูแลระบบ AI</h1>
-            <button id="admin-refresh" class="outline"><i data-icon="refresh-cw"></i>รีเฟรช</button>
+            <h1>จัดการผู้ช่วย / Admin</h1>
+            <button id="admin-refresh" class="outline"><i data-icon="refresh-cw"></i>รีเฟรช / Refresh</button>
           </div>
+          <nav class="admin-steps" id="admin-steps" aria-label="ขั้นตอนการตั้งค่า / Setup steps" hidden>
+            <button class="outline" type="button" id="step-connect">1 · เชื่อม AI / Connect</button>
+            <button class="outline" type="button" id="step-upload">2 · เพิ่มเอกสาร / Add files</button>
+            <button class="outline" type="button" id="step-test">3 · ลองถาม / Test chat</button>
+          </nav>
           <section id="admin-providers" class="admin-card provider-panel" hidden aria-labelledby="providers-heading">
             <div class="section-head">
-              <div><h2 id="providers-heading">ผู้ให้บริการโมเดล</h2><p class="muted" id="provider-caption"></p></div>
-              <button type="button" id="provider-add" class="outline"><i data-icon="plus"></i>เพิ่มโปรไฟล์</button>
+              <div><h2 id="providers-heading">เชื่อม AI / Connect AI</h2><p class="muted" id="provider-caption"></p></div>
+              <button type="button" id="provider-add" disabled class="outline"><i data-icon="plus"></i>เพิ่มการเชื่อมต่อ / Add connection</button>
             </div>
             <div id="provider-rows"></div>
             <p id="provider-result" role="status"></p>
           </section>
           <section id="admin-documents" class="admin-card" hidden>
             <div class="section-head">
-              <h2>เอกสารสำหรับผู้ช่วย AI</h2>
+              <h2>เอกสารที่ใช้ตอบ / Knowledge library</h2>
               <button id="open-departments" class="outline" type="button">
-                <i data-icon="team"></i>จัดการแผนก
+                <i data-icon="team"></i>จัดการแผนก / Departments
               </button>
               <button id="document-refresh" class="outline" type="button">
-                <i data-icon="refresh-cw"></i>รีเฟรชเอกสาร
+                <i data-icon="refresh-cw"></i>โหลดใหม่ / Refresh
               </button>
             </div>
             <div class="document-admin-grid">
               <form id="pdf-upload">
-                <h3>อัปโหลดเอกสาร</h3>
+                <h3>เพิ่มเอกสาร / Add a document</h3>
                 <div class="file-picker">
-                  <label for="pdf-file"><i data-icon="upload"></i>เลือกไฟล์จากเครื่อง</label>
-                  <output id="selected-file" for="pdf-file">ยังไม่ได้เลือกไฟล์</output>
+                  <label for="pdf-file"><i data-icon="upload"></i>เลือกไฟล์ / Choose file</label>
+                  <output id="selected-file" for="pdf-file">ยังไม่ได้เลือกไฟล์ / No file chosen</output>
                 <input
                   type="file"
                   id="pdf-file"
@@ -282,21 +304,22 @@
                   PDF, Word, Excel, PowerPoint, TXT, Markdown และ CSV สูงสุด 15
                   MB · PDF ไม่เกิน 80 หน้า
                 </p>
-                <label for="pdf-title">ชื่อเอกสาร</label>
+                <label for="pdf-title">ชื่อเอกสาร / Document title</label>
                 <input id="pdf-title" required minlength="2" maxlength="160" />
-                <label for="pdf-owner">หน่วยงานเจ้าของเอกสาร</label>
+                <label for="pdf-owner">เจ้าของเอกสาร / Document owner</label>
                 <input id="pdf-owner" required minlength="2" maxlength="100" />
+                <p class="meta">ผู้ที่ตรงกับบทบาท แผนก หรือรายชื่ออย่างใดอย่างหนึ่งจะเห็นเอกสาร หากให้เฉพาะ HR ให้เลือกเพียงแผนก HR / Any selected group grants access. For HR only, select just the HR department.</p>
                 <fieldset class="role-options">
-                  <legend>สิทธิ์ตามบทบาท</legend>
+                  <legend>ให้สิทธิ์ตามบทบาท / Roles</legend>
                 </fieldset>
                 <div class="scoped-readers"></div>
                 <button class="primary" type="submit">
-                  <i data-icon="upload"></i>อัปโหลดและจัดทำดัชนี
+                  <i data-icon="upload"></i>เผยแพร่ให้ผู้ที่เลือก / Publish to readers
                 </button>
                 <p id="upload-status" role="status" class="meta"></p>
               </form>
               <div>
-                <h3>เอกสารที่อัปโหลด</h3>
+                <h3>สถานะเอกสาร / Document status</h3>
                 <div id="managed-list" aria-live="polite"></div>
                 <div class="document-pages" aria-label="หน้าเอกสาร">
                   <button
@@ -305,7 +328,7 @@
                     type="button"
                     hidden
                   >
-                    หน้าก่อน
+                    หน้าก่อน / Previous
                   </button>
                   <button
                     id="documents-next"
@@ -313,13 +336,14 @@
                     type="button"
                     hidden
                   >
-                    หน้าถัดไป
+                    หน้าถัดไป / Next
                   </button>
                 </div>
               </div>
             </div>
           </section>
-          <div id="admin-content" aria-live="polite"></div>
+          <details class="admin-card" id="admin-operations" hidden><summary>การใช้งานและการแก้ปัญหา / Usage &amp; diagnostics</summary><div id="admin-content" aria-live="polite"></div></details>
+          <div id="admin-gate" role="status"></div>
         </section>
         <p id="error" role="alert"></p>
       </main>
@@ -331,18 +355,19 @@
           <i data-icon="x"></i>
         </button>
       </div>
-      <h2 id="access-title">แก้ไขสิทธิ์เอกสาร</h2>
+      <h2 id="access-title">แก้ไขผู้ที่เห็นเอกสาร / Edit readers</h2>
       <p id="access-document" class="meta"></p>
       <form id="document-access">
-        <fieldset class="role-options">
-          <legend>สิทธิ์ตามบทบาท</legend>
+        <p class="meta">ผู้ที่ตรงกับบทบาท แผนก หรือรายชื่ออย่างใดอย่างหนึ่งจะเห็นเอกสาร หากให้เฉพาะ HR ให้เลือกเพียงแผนก HR / Any selected group grants access. For HR only, select just the HR department.</p>
+                <fieldset class="role-options">
+          <legend>ให้สิทธิ์ตามบทบาท / Roles</legend>
         </fieldset>
         <div class="scoped-readers"></div>
         <label
           ><input type="checkbox" id="pdf-enabled" />
-          เปิดให้ค้นจากแชตและคลังเอกสาร</label
+          แสดงในแชตและคลัง / Available in chat and library</label
         >
-        <button class="primary" type="submit">บันทึกสิทธิ์</button>
+        <button class="primary" type="submit">บันทึกสิทธิ์ / Save access</button>
         <p id="access-status" role="status" class="meta"></p>
       </form>
     </dialog>
@@ -353,30 +378,30 @@
           <i data-icon="x"></i>
         </button>
       </div>
-      <h2 id="departments-title">จัดการแผนก</h2>
+      <h2 id="departments-title">จัดการแผนก / Departments</h2>
       <form id="department-create">
-        <label for="department-code">รหัสแผนก</label>
+        <label for="department-code">รหัสแผนก / Department code</label>
         <input id="department-code" placeholder="HR" maxlength="24" required />
-        <label for="department-name">ชื่อแผนก</label>
+        <label for="department-name">ชื่อแผนก / Department name</label>
         <input
           id="department-name"
           placeholder="ฝ่ายทรัพยากรบุคคล"
           maxlength="80"
           required
         />
-        <button class="primary" type="submit">เพิ่มแผนก</button>
+        <button class="primary" type="submit">เพิ่มแผนก / Add department</button>
       </form>
       <div class="department-members-wrap">
-        <label for="membership-department">สมาชิกแผนก</label>
+        <label for="membership-department">สมาชิกแผนก / Members</label>
         <select id="membership-department"></select>
-        <label for="membership-query">ค้นหาบัญชีพนักงาน</label>
+        <label for="membership-query">ค้นหาพนักงาน / Find employee</label>
         <div class="identity-search">
           <input type="search" id="membership-query" maxlength="260" /><button
             id="membership-find"
             class="outline"
             type="button"
           >
-            ค้นหา
+            ค้นหา / Search
           </button>
         </div>
         <div id="memberships" aria-live="polite"></div>
@@ -411,14 +436,14 @@
     <dialog id="provider-editor" aria-labelledby="provider-title">
       <form id="provider-form" class="provider-form">
         <div class="section-head"><h2 id="provider-title">เพิ่มโปรไฟล์โมเดล</h2><button class="quiet close" id="provider-close" type="button" aria-label="ปิด"><i data-icon="x"></i></button></div>
-        <label>ชื่อโปรไฟล์<input id="provider-name" maxlength="80" placeholder="เช่น แชตพนักงาน" required></label>
-        <label>ประเภทงาน<select id="provider-purpose"><option value="chat">ตอบแชต</option><option value="embedding">สร้าง embeddings</option></select></label>
-        <label>ผู้ให้บริการ<select id="provider-vendor"></select></label>
-        <label>Model / deployment ID<input id="provider-model" maxlength="150" required></label>
+        <label>ชื่อเรียก / Connection name<input id="provider-name" maxlength="80" placeholder="เช่น แชตพนักงาน" required></label>
+        <label>ใช้สำหรับ / Purpose<select id="provider-purpose"><option value="chat">เขียนและตอบคำถาม / Chat</option><option value="embedding">ค้นเนื้อหาในเอกสาร / Document search</option></select></label>
+        <label>ผู้ให้บริการ / Provider<select id="provider-vendor"></select></label>
+        <label>ชื่อรุ่นจากผู้ให้บริการ / Model ID<input id="provider-model" maxlength="150" required></label>
         <label>API key<input type="password" id="provider-key" autocomplete="new-password" maxlength="8192" required></label>
-        <p class="muted">ระบบเก็บคีย์แบบเข้ารหัส เมื่อบันทึกแล้วสามารถทดสอบก่อนเลือกใช้งานได้</p>
+        <p class="muted">ระบบเข้ารหัสคีย์ หลังบันทึกให้กดทดสอบ แล้วเลือกใช้ / Keys are encrypted. Save, test, then select the connection.</p>
         <p id="provider-form-error" role="alert"></p>
-        <button type="submit" class="primary">บันทึก</button>
+        <button type="submit" class="primary">บันทึก / Save</button>
       </form>
     </dialog>
     <dialog id="doc-dialog">

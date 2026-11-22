@@ -1,0 +1,27 @@
+# คู่มือแชตและหน้าผู้ดูแล / Chat and admin guide
+
+## ตั้งค่าคลังองค์กร / Set up company knowledge
+
+1. เปิด **จัดการผู้ช่วย → เชื่อม AI / Connect** เพิ่มการเชื่อมต่อสำหรับ **ค้นเนื้อหาในเอกสาร / Document search** และ **เขียนและตอบคำถาม / Chat** เลือกผู้ให้บริการ ใส่ชื่อรุ่นและ API key จากนั้นกด **บันทึก → ทดสอบ → เลือกใช้** สำหรับแต่ละงาน ในระบบที่ตั้งค่าโมเดลไว้แล้ว ใช้ค่าเริ่มต้นของระบบได้
+2. เลือก **เพิ่มเอกสาร / Add files** ระบุชื่อและเจ้าของเอกสาร เลือกผู้ที่เห็นได้ แล้วกด **เผยแพร่ให้ผู้ที่เลือก / Publish to readers** สิทธิ์เป็นแบบรวม ผู้ที่ตรงกับบทบาท แผนก หรือรายชื่ออย่างใดอย่างหนึ่งจะอ่านได้ หากเอกสารสำหรับ HR เท่านั้น ให้เลือกแค่แผนก HR แล้วรอ **ถามในแชตได้แล้ว / Ready**
+3. เลือก **ลองถาม / Test chat** เพื่อเปิดแชตของบัญชีปัจจุบัน เมื่อตรวจรับสิทธิ์ให้เปิดบัญชีพนักงานจริงของแต่ละกลุ่มแยกโปรไฟล์ แล้วถามคำถามเดียวกัน ตรวจทั้งแหล่งอ้างอิงและคลังเอกสาร [วิธีเปิดบัญชี HR และนอก HR](../README.md)
+
+In Admin, connect a document search model and a chat model. Save, test and activate each connection. Upload a file, choose its readers and wait for **Ready**. Access applies in both the library and chat. Test with the intended employee accounts. The admin's own chat uses the admin's document permissions.
+
+## ใช้แชต / Use chat
+
+| ต้องการทำอะไร / Goal | วิธีใช้ / Action |
+|---|---|
+| ถามนโยบาย / Ask about policy | เปิด **ถามผู้ช่วย / Ask** เช่น “ลาพักร้อนต้องยื่นล่วงหน้ากี่วัน” เปิดที่มาเพื่อตรวจเอกสารและตำแหน่งอ้างอิง |
+| อ่านไฟล์ส่วนตัว / Read a file | เลือก **แนบไฟล์ / Attach** แล้วถามคำที่อยู่ในไฟล์ หรือพิมพ์ **preview** เพื่อดูข้อความช่วงต้น ไฟล์แนบใช้ได้กับเจ้าของในแชตนั้น การเพิ่มเข้าคลังองค์กรทำผ่านหน้า Admin |
+| ดูตารางและกราฟ / Explore data | แนบ CSV หรือ XLSX ที่มีหัวตารางไม่ซ้ำ พิมพ์ **แสดงตาราง** เลือกคอลัมน์ตัวเลขที่ต้องการดูในกราฟ ตารางเลื่อนได้และส่งออกข้อมูลครบทุกแถว |
+| คำนวณ / Calculate | พิมพ์ **คำนวณ (1200 + 300) / 3** หรือเลือก **คำนวณ / Calculate** แล้วพิมพ์ `sum(col("Sales"))` กับตารางที่แนบ รองรับ sum, mean, min, max, count และ round |
+| เขียนเอกสาร / Draft | เลือก **ร่างเอกสาร / Draft** ระบุผู้รับ จุดประสงค์และเนื้อหา เช่น “ร่างอีเมลภาษาไทยเชิญทีมประชุมวันจันทร์” ข้อความทยอยแสดงขณะโมเดลเขียน กด **หยุด / Stop** เพื่อหยุดรับข้อความ ร่างต่อจากร่างก่อนหน้าได้ |
+| ตรวจเคส / Check cases | เลือก **เคสของฉัน / My cases** แล้วถาม ระบบตรวจรายการที่บัญชีนั้นอ่านได้ |
+| ส่งออก / Download | ใต้คำตอบเลือก PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), CSV หรือ Markdown แล้วกด **ดาวน์โหลด / Download** หรือพิมพ์ “ส่งออกเป็น PDF” ต่อจากคำตอบในโหมด Ask |
+
+**ไฟล์แนบ** รองรับ PDF, DOCX, PPTX, XLSX, TXT, Markdown และ CSV ขนาดสูงสุด 5 MiB ต่อไฟล์ เลือกใช้ครั้งละหนึ่งไฟล์ต่อข้อความ ตารางใช้ชีตแรก สูงสุด 500 แถวข้อมูลและ 16 คอลัมน์ กราฟแสดงได้ถึง 20 แถวแรก สไลด์แสดงตัวอย่างตารางถึง 30 แถว การคำนวณใช้ชุดสูตรที่กำหนดในกระบวนการแยกพร้อมจำกัดเวลา
+
+**Privacy and processing.** Private attachments are scoped to the signed-in account, role and conversation. Document search and calculator tools can process an attachment without a chat provider. Choosing Draft sends the brief, up to 10,000 characters of extracted reference text and, for revisions, up to 4,000 characters of the preceding draft to the configured provider. The title feature sends the redacted opening question after the first successful reply. When naming is unavailable, the opening question is used as the title.
+
+**ที่มาและขั้นตอน / Sources & steps** แสดงงานที่เกิดขึ้นจริง เช่น ตรวจสิทธิ์ ค้นเอกสาร หรือคำนวณ พร้อมที่มาและรหัสติดตาม คำตอบนโยบายจะแสดงหลังตรวจหลักฐานและสิทธิ์เสร็จ ร่างเอกสารแสดงข้อความจากโมเดลขณะเขียน ผู้ใช้ตรวจทานร่างก่อนนำไปเผยแพร่ได้
