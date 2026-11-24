@@ -221,6 +221,8 @@ def test_chat_provider_only_receives_department_authorized_evidence(
         sent.clear()
         other = service.ask(User("local/demo.non-hr", "employee"), question)
         assert other["status"] == "fallback" and not other["sources"]
+        assert not sent  # No authorized evidence names the requested project.
+        service.ask(User("local/demo.non-hr", "employee"), "ค่าแท็กซี่เบิกได้สูงสุดกี่บาทต่อเที่ยว")
         assert sent and all(
             "2,750" not in r["text"] and DOC_ID not in r["id"]
             for batch in sent

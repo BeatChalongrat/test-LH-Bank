@@ -23,7 +23,7 @@ from knowledge.db import (
 from knowledge.document_worker import work_once
 from knowledge.encoder import Encoder
 from knowledge.ingest import activate, ingest
-from knowledge.security import provision
+from knowledge.security import covers_qualifiers, provision
 from knowledge.service import Selection, Service
 
 
@@ -41,6 +41,13 @@ class ControlledGenerator:
         if self.fail:
             raise httpx.ConnectError("offline")
         return Selection(1, {})
+
+
+def test_specific_project_must_match_before_selecting_expense_evidence():
+    q = "โครงการวารีเบิกค่าตรวจได้เท่าไร"
+    assert covers_qualifiers(q, "วงเงินโครงการวารีต่อปี")
+    assert not covers_qualifiers(q, "วงเงินโครงการดาราต่อปี")
+    assert covers_qualifiers("โครงการนี้เบิกได้เท่าไร", "ระเบียบเบิกค่ารักษา")
 
 
 def test_policy_change_while_model_is_running(system, monkeypatch):
@@ -241,6 +248,10 @@ def test_persistent_conversation_and_citations(system):
 
     first, result = send("ค่าแท็กซี่เบิกได้สูงสุดกี่บาทต่อเที่ยว")
     assert result["sources"][0]["doc_id"] == "FIN-01" and not result["used_context"]
+    assert (
+        api.post(path + "/title", headers=keys["one"], json={}).json()["title"]
+        == result["sources"][0]["title"]
+    )
     follow, result = send("แล้วต้องยื่นภายในกี่วัน", first)
     assert result["used_context"] and result["sources"][0]["doc_id"] == "FIN-01"
     assert "15 วันปฏิทิน" in result["answer"]

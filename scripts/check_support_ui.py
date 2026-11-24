@@ -51,6 +51,9 @@ def main():
         expect(employee.locator("#question")).to_have_value("บิลค่าเดินทางหาย ทำไงดี")
         employee.locator("#submitq").click()
         expect(turn.locator(".source summary")).to_contain_text("FIN-02", timeout=45000)
+        expect(employee.locator(".history-entry[aria-current]")).to_have_text(
+            "การเบิกเมื่อใบเสร็จสูญหาย"
+        )
         employee.locator("#question").fill("เบิกค่าแท็กซี่ต่างประเทศได้สูงสุดเท่าไร")
         employee.locator("#submitq").click()
         follow = employee.get_by_role("button", name="ติดตามรายการ")

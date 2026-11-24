@@ -116,7 +116,26 @@ QUALIFIERS = [
 ]
 
 
+NAMED_CLAIM = re.compile(r"โครงการ\s*([ก-๙A-Za-z0-9-]{2,60}?)\s*(?:ให้เบิก|เบิก)")
+
+
 def covers_qualifiers(question, text):
+    # In a named scheme's claim, another scheme's similar allowance is not evidence.
+    name = NAMED_CLAIM.search(question)
+    if name and name[1] not in {
+        "นี้",
+        "นั้น",
+        "ดังกล่าว",
+        "เดียวกัน",
+        "ของเรา",
+        "ของบริษัท",
+        "ไหน",
+        "ใด",
+        "อะไร",
+        "ไหนบ้าง",
+    }:
+        if normalize(name[1]) not in normalize(text):
+            return False
     # A procedure that requires evidence cannot confirm an exception when the employee lacks it.
     for term in ("หลักฐานการชำระเงิน", "ใบรับรองแพทย์", "ใบเสร็จ", "การอนุมัติ"):
         if re.search(r"(?:ไม่มี|ขาด|ไม่แนบ|ไม่ได้แนบ)\s*" + term, question):

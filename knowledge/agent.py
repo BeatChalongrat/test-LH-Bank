@@ -38,6 +38,7 @@ from .db import (
     turns,
 )
 from .security import INJECTION, OFF_TOPIC, normalize, redact
+from .search import grams
 from .provider_profiles import active_profile
 from .response_policy import POLICY_REF, POLICY_URL
 from .workspace import case_clearance
@@ -748,6 +749,15 @@ def install_agent(app, current, answer, run_model):
                         conversations.c.title,
                         turns.c.question,
                         turns.c.result["status"].as_string().label("status"),
+                        turns.c.result["sources"][0]["title"]
+                        .as_string()
+                        .label("document_title"),
+                        turns.c.result["report_title"]
+                        .as_string()
+                        .label("report_title"),
+                        turns.c.result["attachment"]["name"]
+                        .as_string()
+                        .label("filename"),
                     )
                     .select_from(turns.join(conversations))
                     .where(scope)
@@ -760,18 +770,27 @@ def install_agent(app, current, answer, run_model):
             raise HTTPException(404)
         if row.status != "answered" or row.title != row.question[:90]:
             return {"title": row.title}
-        try:
-            title = await run_model(
-                generate,
-                "Name this workplace conversation in the same language as the user. Output a single short title, at most 8 words. No quotes or commentary.",
-                row.question,
-                40,
-                lambda *args: None,
-                Event(),
-            )
-            title = title.splitlines()[0].strip(' "#*')[:60] or row.title
-        except HTTPException:
-            return {"title": row.title}
+        title = row.document_title or row.report_title or row.filename
+        if not title:
+            try:
+                proposed = await run_model(
+                    generate,
+                    "Name this workplace conversation in the user's language. Keep the topic from the question. Output a single short title, at most 8 words.",
+                    row.question,
+                    40,
+                    lambda *args: None,
+                    Event(),
+                )
+                proposed = proposed.splitlines()[0].strip(' "#*')[:60]
+                # Keep a recognizable part of the user's topic in generated titles.
+                language_matches = not re.search(r"[ก-ฮ]", row.question) or re.search(
+                    r"[ก-ฮ]", proposed
+                )
+                if language_matches and len(grams(row.question) & grams(proposed)) >= 2:
+                    title = proposed
+            except HTTPException:
+                pass
+        title = (title or row.title)[:90]
 
         def save():
             with engine.begin() as c:
