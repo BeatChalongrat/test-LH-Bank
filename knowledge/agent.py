@@ -25,6 +25,7 @@ from .provider import ProviderCoolingDown
 from pydantic import BaseModel, ConfigDict, Field
 
 from .db import (
+    assignments,
     conversations,
     events,
     insert_for,
@@ -54,6 +55,11 @@ MY_CASES = re.compile(
 )
 CASE = re.compile(
     r"(?:ขอ(?:ดู|เช็ก|เช็ค)\s*|ติดตาม\s*|ดู\s*)?(?:สถานะ\s*)?(?:เคส|คำร้อง|ticket|case)\s*(?:เลขที่\s*)?[#:]?\s*([a-f0-9]{32}|นี้)(?:อยู่ขั้นตอนไหน|ถึงไหนแล้ว|ล่าสุด)?(?:ครับ|ค่ะ|คะ)?[ ?？]*",
+    re.I,
+)
+CASE_FOLLOWUP = re.compile(
+    r"(?:แล้ว)?(?:เรื่องนี้|เคสนี้)(?:ไปถึงไหนแล้ว|ถึงไหนแล้ว|ใครรับเรื่อง|ได้ผลหรือยัง|ปิดหรือยัง)(?:ครับ|ค่ะ|คะ)?[ ?？]*"
+    r"|(?:any updates? on (?:this|that) (?:case|ticket)|what.s the status of this (?:case|ticket))[ ?.]*",
     re.I,
 )
 STATES = {"open": "รอรับเรื่อง", "in_progress": "กำลังดำเนินการ", "resolved": "ปิดรายการแล้ว"}
@@ -272,12 +278,11 @@ def route(q, previous):
     if MY_CASES.fullmatch(normalized):
         return "case_status", None, False
     case = CASE.fullmatch(normalized)
+    previous_case = previous.get("ticket_id") or previous.get("case_ref")
+    if previous_case and CASE_FOLLOWUP.fullmatch(normalized):
+        return "case_status", previous_case, True
     if case:
-        ref = (
-            case[1]
-            if case[1] != "นี้"
-            else previous.get("ticket_id") or previous.get("case_ref")
-        )
+        ref = case[1] if case[1] != "นี้" else previous_case
         return "case_status", ref or "unspecified", bool(ref and case[1] == "นี้")
     sources = previous.get("sources") or []
     if sources and FOLLOWUP.search(normalized) and not NEW_TOPIC.search(normalized):
@@ -297,6 +302,7 @@ def read_cases(engine, user, pending, ref, used_context):
         if user.role != "executive":
             own = sa.and_(own, tickets.c.scope == "staff")
         status, reason, source = "answered", "tool_result", "ฐานงานสนับสนุน / เคสของฉัน"
+        recent = []
         if not enabled:
             status, reason, source = "refused", "tool_disabled", "ระบบ / การตั้งค่าเครื่องมือ"
             answer = "ขณะนี้ปิดเครื่องมือตรวจเคสในแชต คุณยังเปิดเมนูงานสนับสนุนได้"
@@ -305,10 +311,25 @@ def read_cases(engine, user, pending, ref, used_context):
             answer = "กรุณาระบุเลขเคสจากเมนูงานสนับสนุน หรือพิมพ์ ดูเคสของฉัน เพื่อดูยอดรวม"
         elif ref:
             item = c.execute(
-                sa.select(tickets.c.id, tickets.c.state).where(own, tickets.c.id == ref)
+                sa.select(
+                    tickets.c.id,
+                    tickets.c.state,
+                    tickets.c.resolution,
+                    assignments.c.owner,
+                )
+                .select_from(
+                    tickets.outerjoin(
+                        assignments, assignments.c.ticket_id == tickets.c.id
+                    )
+                )
+                .where(own, tickets.c.id == ref)
             ).first()
             if item:
                 answer = f"เคส {item.id} มีสถานะ {STATES[item.state]}"
+                if item.owner:
+                    answer += "\nผู้รับผิดชอบ · " + item.owner
+                if item.state == "resolved" and item.resolution:
+                    answer += "\nผลจากเจ้าหน้าที่ · " + item.resolution
                 source += " / " + item.id
             else:
                 status, reason, source = (
@@ -331,6 +352,15 @@ def read_cases(engine, user, pending, ref, used_context):
                 + " รายการ\n"
                 + " · ".join(f"{v} {totals.get(k,0)}" for k, v in STATES.items())
             )
+            recent = [
+                dict(row)
+                for row in c.execute(
+                    sa.select(tickets.c.id, tickets.c.question, tickets.c.state)
+                    .where(own)
+                    .order_by(tickets.c.created.desc(), tickets.c.id)
+                    .limit(3)
+                ).mappings()
+            ]
         trace = uuid4().hex
         result = dict(
             status=status,
@@ -348,6 +378,7 @@ def read_cases(engine, user, pending, ref, used_context):
             used_context=used_context,
             read_at=time.time(),
             case_ref=ref if status == "answered" else None,
+            recent_cases=recent,
         )
         c.execute(
             events.insert().values(
@@ -457,7 +488,8 @@ def install_agent(app, current, answer, run_model):
                 normalize(body.question)
             )
             file = None
-            if body.attachment_id and not blocked:
+            lookup_own_cases = body.mode == "auto" and tool == "case_status"
+            if body.attachment_id and not blocked and not lookup_own_cases:
                 stage("file")
                 file = await anyio.to_thread.run_sync(
                     own_file, engine, user, str(conversation_id), body.attachment_id.hex

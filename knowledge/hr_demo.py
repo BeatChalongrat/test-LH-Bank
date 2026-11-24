@@ -1,14 +1,18 @@
 """Opt-in local acceptance fixture. Uploaded documents use the normal indexing queue."""
 
+import json
 import os
 import secrets
 import time
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import sqlalchemy as sa
 
 from .db import (
     ROOT,
     accounts,
+    assignments,
+    case_activity,
     department_members,
     departments,
     documents,
@@ -16,13 +20,66 @@ from .db import (
     initialize,
     insert_for,
     pdf_files,
+    tickets,
 )
 from .documents import Upload, bump_epoch, enqueue_document, read_grants
 from .web_auth import digest
 
 DOC_ID = "DOC-8BCE6DBEFBDA42DC"
 DEPARTMENT = "HR-DEMO"
-ACCOUNTS = {"demo.hr": "employee", "demo.non-hr": "employee", "demo.admin": "admin"}
+ACCOUNTS = {
+    "demo.hr": "employee",
+    "demo.non-hr": "employee",
+    "demo.admin": "admin",
+    "demo.reviewer": "reviewer",
+}
+
+
+def seed_support_cases(conn):
+    cases = json.loads((ROOT / "data/hr-demo/support-cases.json").read_text("utf-8"))
+    now = time.time()
+    reviewer = "local/demo.reviewer"
+    for case in cases:
+        ticket = uuid5(NAMESPACE_URL, "local/demo.non-hr/" + case["reference"]).hex
+        created = now - case["hours_ago"] * 3600
+        resolved = case["state"] == "resolved"
+        inserted = conn.scalar(
+            insert_for(conn, tickets)
+            .values(
+                id=ticket,
+                subject="local/demo.non-hr",
+                scope="staff",
+                question=case["question"],
+                state=case["state"],
+                created=created,
+                resolution=case.get("resolution"),
+                resolved_by=reviewer if resolved else None,
+                resolved_at=created + 3600 if resolved else None,
+            )
+            .on_conflict_do_nothing(index_elements=["id"])
+            .returning(tickets.c.id)
+        )
+        if inserted is None or case["state"] == "open":
+            continue
+        conn.execute(
+            assignments.insert().values(
+                ticket_id=ticket,
+                owner=reviewer,
+                claimed_at=created + 900,
+            )
+        )
+        for action, offset in (
+            [("claimed", 900), ("resolved", 3600)] if resolved else [("claimed", 900)]
+        ):
+            conn.execute(
+                case_activity.insert().values(
+                    id=uuid4().hex,
+                    ticket_id=ticket,
+                    actor=reviewer,
+                    action=action,
+                    ts=created + offset,
+                )
+            )
 
 
 def seed(engine):
@@ -66,12 +123,13 @@ def seed(engine):
             raise ValueError(
                 "demo.non-hr is already a member of HR-DEMO; review its membership"
             )
-        member = conn.execute(
+        member = conn.scalar(
             insert_for(conn, department_members)
             .values(department=DEPARTMENT, subject="local/demo.hr")
             .on_conflict_do_nothing(index_elements=["department", "subject"])
+            .returning(department_members.c.subject)
         )
-        if member.rowcount:
+        if member is not None:
             bump_epoch(conn)
         existing = (
             conn.execute(sa.select(documents).where(documents.c.id == DOC_ID))
@@ -102,6 +160,7 @@ def seed(engine):
                 departments={DEPARTMENT},
             )
             enqueue_document(conn, DOC_ID, upload, content, "system/local-demo")
+        seed_support_cases(conn)
 
 
 def main():

@@ -9,32 +9,11 @@ from pathlib import Path
 from uuid import uuid4
 
 import httpx
-from openpyxl import Workbook
 from pptx import Presentation
 
 QUESTION = "ช่วยสรุปยอดขาย ทำกราฟ แล้วทำเป็น PowerPoint ให้หน่อย"
 MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม"]
 SALES = [20500, 21500, 43500]
-
-
-def workbook():
-    wb = Workbook()
-    sheet = wb.active
-    sheet.title = "ยอดขายไตรมาส 1"
-    sheet.append(["เดือน", "สาขา", "ยอดขาย (บาท)", "จำนวนบิล"])
-    for month, branch, amount, bills in [
-        (0, "เหนือ", 18000, 18),
-        (0, "ใต้", 2500, 3),
-        (1, "เหนือ", 23000, 21),
-        (1, "ใต้", -1500, 1),
-        (2, "เหนือ", 28500, 28),
-        (2, "ใต้", 15000, 12),
-    ]:
-        sheet.append([MONTHS[month], branch, amount, bills])
-    sheet.append(["รวม", "", 85500, 83])
-    buf = io.BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
 
 
 def main():
@@ -60,8 +39,6 @@ def main():
     else:
         base = args.base_url.rstrip("/")
     args.out.mkdir(exist_ok=True, parents=True)
-    raw = workbook()
-    (args.out / "sales-q1.xlsx").write_bytes(raw)
     headers = {"Origin": base, "X-Desk-Request": "1"}
     if token:
         headers["Authorization"] = "Bearer " + token
@@ -69,6 +46,10 @@ def main():
         if not token:
             exchange = client.post("/api/auth/invite", json={"code": invite("hr")})
             exchange.raise_for_status()
+        sample = client.get("/static/samples/sales-q1.xlsx")
+        sample.raise_for_status()
+        raw = sample.content
+        (args.out / "sales-q1.xlsx").write_bytes(raw)
         path = "/api/conversations/" + str(uuid4())
         upload = client.post(
             path + "/attachments",

@@ -11,9 +11,24 @@ from pptx import Presentation
 from pypdf import PdfReader
 
 from knowledge.api import create_app
+from knowledge.chat_tools import attachment_answer
 from knowledge.db import engine_for, initialize
 from knowledge.security import provision
 from knowledge.service import Generator, Service
+
+
+def test_handoff_from_timestamped_notes():
+    blocks = [
+        [
+            "note",
+            "09:30 Agent: queued\n11:00 Agent: two receipts received\nNext step: check dates",
+        ]
+    ]
+    file = {"payload": {"blocks": blocks}}
+    answer = attachment_answer("Summarize the next steps", file)
+    assert "two receipts received" in answer and "Next step: check dates" in answer
+    assert "09:30" not in answer
+    assert "09:30" in attachment_answer("preview", file)
 
 
 @pytest.fixture

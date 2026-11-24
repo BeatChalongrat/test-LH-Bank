@@ -959,33 +959,6 @@ dialog h2 {
   padding: 9px;
   border-radius: 50%;
 }
-.prompts {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: 15px;
-}
-.prompts button {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: #3b5967;
-  border: 1px solid var(--line);
-  background: white;
-  padding: 7px 12px;
-  border-radius: 20px;
-  font-size: 0.87rem;
-}
-.prompts button:hover {
-  background: var(--light);
-  border-color: #b4cfd9;
-}
-.prompts .icon {
-  width: 16px;
-  height: 16px;
-  color: var(--blue);
-}
 #chat-progress {
   text-align: center;
   font-size: 0.86rem;
@@ -1058,18 +1031,8 @@ dialog h2 {
   .current-location { display: none; }
   .account { max-width: 48%; }
   .head { gap: 4px; }
-  .chat-stage:has(.chat-turn) .prompts button:not(#ask-cases) {
-    display: none;
-  }
   #query {
     padding: 8px 8px 8px 14px;
-  }
-  .prompts {
-    gap: 6px;
-  }
-  .prompts button {
-    font-size: 0.8rem;
-    padding: 7px 9px;
   }
 }
 .chat-turn {

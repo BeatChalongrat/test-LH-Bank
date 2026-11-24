@@ -140,22 +140,46 @@ def install_workspace(app, current):
                 ).mappings()
             )
 
-    @app.get("/api/tickets")
-    def queue(
-        user=Depends(current),
-        offset: int = Query(0, ge=0),
-        limit: int = Query(50, ge=1, le=200),
-        state: Literal["open", "in_progress", "resolved"] | None = None,
-    ):
-        stmt = (
+    def visible_tickets(user):
+        return (
             sa.select(tickets, assignments.c.owner, assignments.c.claimed_at)
             .select_from(
                 tickets.outerjoin(assignments, assignments.c.ticket_id == tickets.c.id)
             )
             .where(readable_cases(user))
         )
+
+    @app.get("/api/tickets/{ticket_id}")
+    def ticket_detail(ticket_id: str, user=Depends(current)):
+        with app.state.service.engine.connect() as conn:
+            item = (
+                conn.execute(visible_tickets(user).where(tickets.c.id == ticket_id))
+                .mappings()
+                .first()
+            )
+        if not item:
+            raise HTTPException(404)
+        return item
+
+    @app.get("/api/tickets")
+    def queue(
+        user=Depends(current),
+        offset: int = Query(0, ge=0),
+        limit: int = Query(50, ge=1, le=200),
+        state: Literal["open", "in_progress", "resolved"] | None = None,
+        q: str = Query("", max_length=160),
+    ):
+        stmt = visible_tickets(user)
         if state:
             stmt = stmt.where(tickets.c.state == state)
+        term = q.strip()
+        if term:
+            stmt = stmt.where(
+                sa.or_(
+                    tickets.c.id == term.lower(),
+                    tickets.c.question.icontains(term, autoescape=True),
+                )
+            )
         with app.state.service.engine.connect() as conn:
             return list(
                 conn.execute(

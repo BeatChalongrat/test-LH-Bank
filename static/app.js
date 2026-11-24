@@ -12,6 +12,7 @@ const stateName = {
   resolved: "ปิดรายการแล้ว",
 };
 const views = ["home", "ask", "library", "queue", "admin"];
+const caseRoute = /^queue\/([a-f0-9]{32})$/;
 const NS = "http://www.w3.org/2000/svg";
 let me = null,
   auth = {},
@@ -78,6 +79,7 @@ function clearIdentity() {
   $("chat-history").replaceChildren();
   $("question").value = "";
   $("doc-q").value = "";
+  $("case-q").value = $("case-state").value = "";
   $("identity").textContent = "เข้าสู่ระบบ";
 }
 async function api(path, data, required = true) {
@@ -274,7 +276,7 @@ async function listPage(target, path, render, seq, offset = 0) {
       empty(
         target === "documents"
           ? "ไม่พบเอกสารตามเงื่อนไขที่ค้น"
-          : "ไม่มีรายการในสถานะนี้",
+          : "ไม่มีเคสที่ตรงกับเงื่อนไข",
       ),
     );
   if (rows.length > limit) {
@@ -393,7 +395,7 @@ function ticket(r) {
   return box;
 }
 async function show(name) {
-  view = views.includes(name)
+  view = caseRoute.test(name) ? "queue" : views.includes(name)
     ? name
     : location.pathname === "/admin"
       ? "admin"
@@ -440,18 +442,29 @@ async function show(name) {
       if ($("doc-kind").value) p.set("kind", $("doc-kind").value);
       await listPage(target, "/api/sources?" + p, docRow, seq);
     } else {
+      const caseId = caseRoute.exec(location.hash.slice(1))?.[1];
+      $("all-cases").hidden = !caseId;
+      $("case-state").hidden = $("case-search").hidden = $("queue-controls").querySelector('label[for="case-state"]').hidden = !!caseId;
+      $("case-submit").textContent = caseId ? "รีเฟรช" : "แสดงผล";
+      if (caseId) {
+        $("queue-description").textContent = "รายละเอียดและผลตรวจสอบของเคส";
+        try {
+          const row = await api("/api/tickets/" + caseId);
+          if (seq === epoch) $(target).replaceChildren(ticket(row));
+        } catch (err) {
+          if (seq === epoch) $(target).replaceChildren(empty(err.message));
+        }
+        return;
+      }
       $("queue-description").textContent = ["employee", "admin"].includes(
         me.role,
       )
         ? "ติดตามการรับเรื่องและคำตอบของคุณ"
         : "ตรวจรายการ รับผิดชอบเคส และบันทึกผลการตรวจสอบ";
-      await listPage(
-        target,
-        "/api/tickets" +
-          ($("case-state").value ? "?state=" + $("case-state").value : ""),
-        ticket,
-        seq,
-      );
+      const filters = new URLSearchParams();
+      if ($("case-state").value) filters.set("state", $("case-state").value);
+      if ($("case-q").value.trim()) filters.set("q", $("case-q").value.trim());
+      await listPage(target, "/api/tickets?" + filters, ticket, seq);
     }
   } catch (err) {
     handleError(err, seq);
@@ -530,7 +543,11 @@ $("library-filter").onsubmit = (e) => {
   show("library");
 };
 $("doc-kind").onchange = () => show("library");
-$("case-state").onchange = $("refresh").onclick = () => show("queue");
+$("case-state").onchange = () => show("queue");
+$("queue-controls").onsubmit = (event) => {
+  event.preventDefault();
+  show("queue");
+};
 function source(s) {
   const details = el("details", undefined, "source");
   details.append(
@@ -551,10 +568,10 @@ async function boot() {
     params = new URLSearchParams(fragment),
     invite = params.get("invite");
   const authFailure = new URLSearchParams(location.search).get("login");
-  view = views.includes(fragment)
+  view = caseRoute.test(fragment) ? "queue" : views.includes(fragment)
     ? fragment
-    : invite && params.get("view") === "ask"
-      ? "ask"
+    : invite && ["ask", "queue"].includes(params.get("view"))
+      ? params.get("view")
     : location.pathname === "/admin"
       ? "admin"
       : "home";

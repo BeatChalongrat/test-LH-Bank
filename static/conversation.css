@@ -167,10 +167,12 @@ body:has(#ask:not([hidden])) nav a[aria-current] {
   margin: 0 0 7px 4px;
   padding: 4px 9px;
 }
-#sample-files {
+#sample-files,
+#work-starters {
   margin-top: 24px;
 }
-#sample-heading {
+#sample-heading,
+#work-heading {
   margin: 0 0 10px 2px;
   color: var(--chat-muted);
   font-size: 0.82rem;
@@ -237,21 +239,27 @@ body:has(#ask:not([hidden])) nav a[aria-current] {
   background: #eaeaf5;
   color: #626591;
 }
-.prompts {
-  margin-top: 13px;
-}
-.prompts button {
-  background: transparent;
-  border: 0;
-  color: #5e716f;
-  padding: 4px 7px;
-  border-radius: 6px;
-  font-size: 0.79rem;
-}
-.chat-stage:has(.chat-turn) #sample-files,
-.chat-stage:has(.chat-turn) .prompts {
+.chat-stage:has(.chat-turn) :is(#sample-files, #work-starters),
+.composer-area:has(#question:not(:placeholder-shown), #chat-file-chip:not([hidden])) :is(#sample-files, #work-starters) {
   display: none;
 }
+.chat-case-list {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+.chat-case-list a {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--chat-ink);
+  text-decoration: none;
+  border: 1px solid var(--chat-line);
+  border-radius: 9px;
+  padding: 9px 12px;
+}
+.chat-case-list a:hover { background: #f5faf8; }
+.chat-case-list .status { flex-shrink: 0; }
 #result:not(:empty) {
   margin: 0 0 12px;
   padding: 2px 8px 6px;
@@ -536,7 +544,7 @@ body:has(#ask:not([hidden])) nav a[aria-current] {
   #chat-intro {
     margin-bottom: 16px;
   }
-  #sample-files {
+  #sample-files, #work-starters {
     margin-top: 14px;
   }
   .chat-turn .user-message {

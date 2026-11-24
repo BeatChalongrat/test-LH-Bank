@@ -284,6 +284,55 @@ def test_case_tool_is_private_and_turn_retries_are_idempotent(system):
     ).json()
     assert result["tool"] == "case_status" and result["case_ref"] == ref
     assert ref in result["attribution"] and "รอรับเรื่อง" in result["answer"]
+    detail = "/api/tickets/" + ref
+    assert api.get(detail, headers=keys["two"]).status_code == 404
+    assert api.get(detail, headers=keys["one"]).json()["id"] == ref
+    assert [
+        row["id"]
+        for row in api.get(
+            "/api/tickets", params={"q": "เล่าเรียน"}, headers=keys["one"]
+        ).json()
+    ] == [ref]
+    assert api.get("/api/tickets", params={"q": ref}, headers=keys["two"]).json() == []
+    assert api.post(detail + "/claim", headers=keys["review"]).status_code == 200
+    note = "ส่งคำขอให้ฝ่ายบุคคลพิจารณาแล้ว"
+    assert (
+        api.post(
+            detail + "/resolve", headers=keys["review"], json={"resolution": note}
+        ).status_code
+        == 200
+    )
+    own_chat = "/api/conversations/" + str(uuid4()) + "/messages"
+    status_turn = str(uuid4())
+    r = api.post(
+        own_chat,
+        headers=keys["one"],
+        json={
+            "turn_id": status_turn,
+            "question": "สถานะเคส " + ref,
+        },
+    ).json()
+    assert note in r["answer"]
+    follow = api.post(
+        own_chat,
+        headers=keys["one"],
+        json={
+            "turn_id": str(uuid4()),
+            "parent_id": status_turn,
+            "question": "เรื่องนี้ได้ผลหรือยัง",
+        },
+    ).json()
+    assert follow["used_context"] and note in follow["answer"]
+    for account, expected in [("one", [ref]), ("two", [])]:
+        rows = api.post(
+            "/api/conversations/" + str(uuid4()) + "/messages",
+            headers=keys[account],
+            json={
+                "turn_id": str(uuid4()),
+                "question": "ดูเคสของฉัน",
+            },
+        ).json()["recent_cases"]
+        assert [r["id"] for r in rows] == expected
     other = api.post(
         "/api/conversations/" + str(uuid4()) + "/messages",
         headers=keys["two"],

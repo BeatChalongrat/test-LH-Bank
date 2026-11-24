@@ -220,6 +220,25 @@ def numeric_columns(table):
 def attachment_answer(question, file):
     blocks = file["payload"]["blocks"]
     q = normalize(question)
+    if re.search(r"ติดตาม|ส่งต่องาน|งานค้าง|hand.?over|next steps?|action items?", q, re.I):
+        lines = [line.strip() for _, body in blocks for line in body.splitlines()]
+        messages = [line for line in lines if re.match(r"^\[?\d{1,2}[:.]\d{2}\b", line)]
+        actions = [
+            line
+            for line in lines
+            if re.match(
+                r"^(?:งานค้าง|สิ่งที่ต้องติดตาม|ขั้นตอนถัดไป|next steps?|action items?)\s*[:：·–-]",
+                line,
+                re.I,
+            )
+        ]
+        if messages and actions:
+            return (
+                "ข้อความล่าสุดในบันทึก\n"
+                + messages[-1]
+                + "\n\nสิ่งที่ต้องติดตาม\n"
+                + "\n".join(actions)
+            )
     if re.search(r"สรุป|summary|summari[sz]e|แสดง|preview", q, re.I):
         picks = blocks[:4]
     else:

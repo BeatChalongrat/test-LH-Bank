@@ -102,7 +102,21 @@ function renderTurn(question, r, chat, turnId, steps = []) {
     attribution.replaceChildren(link);
   }
   if (!report) reply.append(attribution);
-  if (r.ticket_id) reply.append(button("ติดตามรายการ", () => go("queue")));
+  if (r.recent_cases?.length) {
+    const list = el("div", undefined, "chat-case-list");
+    list.append(el("strong", "เคสล่าสุด"));
+    for (const item of r.recent_cases) {
+      const link = el("a");
+      link.href = "#queue/" + encodeURIComponent(item.id);
+      link.append(el("span", stateName[item.state], "status " + item.state), el("span", item.question));
+      list.append(link);
+    }
+    reply.append(list);
+  }
+  const caseId = r.ticket_id || r.case_ref;
+  if (caseId) reply.append(button("ติดตามรายการ", () => go("queue/" + encodeURIComponent(caseId))));
+  else if (r.tool === "case_status" && r.status === "answered")
+    reply.append(button("ดูงานสนับสนุนทั้งหมด", () => go("queue")));
   const info = el("details", undefined, "trace");
   info.append(
     el("summary", "ที่มาและขั้นตอน / Sources & steps"),
@@ -320,10 +334,8 @@ $("query").onsubmit = (e) => {
 };
 for (const b of document.querySelectorAll("[data-prompt]"))
   b.onclick = () => {
-    attachedFile = null;
-    updateAttachment();
     $("question").value = b.dataset.prompt;
-    $("query").requestSubmit();
+    $("question").focus();
   };
 function adminCard(title) {
   const box = el("section", undefined, "admin-card");

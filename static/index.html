@@ -172,31 +172,22 @@
                   <button type="submit" class="composer-send" id="submitq" aria-label="ส่งข้อความ / Send" title="ส่งข้อความ (Enter)"><i data-icon="arrow-up-right"></i></button>
                 </div>
               </form>
+              <section id="work-starters" aria-labelledby="work-heading">
+                <h2 id="work-heading">ถามจากข้อมูลในระบบ</h2>
+                <div class="sample-grid">
+                  <button type="button" class="sample-card" data-prompt="บิลค่าเดินทางหาย ทำไงดี"><span class="file-tile sheet"><i data-icon="banknote"></i></span><span><strong>ใบเสร็จหาย</strong><small>ดูขั้นตอนและแบบฟอร์ม</small></span><i data-icon="arrow-up-right"></i></button>
+                  <button type="button" class="sample-card" data-prompt="ลาพักร้อนต้องยื่นล่วงหน้ากี่วัน"><span class="file-tile pdf"><i data-icon="calendar-days"></i></span><span><strong>วางแผนลาพักร้อน</strong><small>ดูระยะเวลายื่นคำขอ</small></span><i data-icon="arrow-up-right"></i></button>
+                  <button type="button" id="ask-cases" class="sample-card" data-prompt="ดูเคสของฉัน"><span class="file-tile note"><i data-icon="inbox"></i></span><span><strong>ติดตามเรื่องที่แจ้งไว้</strong><small>ดูสถานะและผลจากเจ้าหน้าที่</small></span><i data-icon="arrow-up-right"></i></button>
+                </div>
+              </section>
               <section id="sample-files" aria-labelledby="sample-heading">
-                <h2 id="sample-heading">ลองจากไฟล์ตัวอย่าง</h2>
+                <h2 id="sample-heading">ลองกับไฟล์ตัวอย่าง</h2>
                 <div class="sample-grid">
                   <button type="button" class="sample-card" data-sample="sales"><span class="file-tile sheet"><i data-icon="files"></i></span><span><strong>สรุปยอดขายไตรมาส 1</strong><small>Excel · กราฟและสไลด์</small></span><i data-icon="arrow-up-right"></i></button>
                   <button type="button" class="sample-card" data-sample="training"><span class="file-tile pdf"><i data-icon="calendar-days"></i></span><span><strong>กำหนดการอบรม</strong><small>PDF · อ่านกำหนดการ</small></span><i data-icon="arrow-up-right"></i></button>
-                  <button type="button" class="sample-card" data-sample="notes"><span class="file-tile note"><i data-icon="messages-square"></i></span><span><strong>บันทึกแชตฝ่ายสนับสนุน</strong><small>TXT · อ่านบทสนทนา</small></span><i data-icon="arrow-up-right"></i></button>
+                  <button type="button" class="sample-card" data-sample="notes"><span class="file-tile note"><i data-icon="messages-square"></i></span><span><strong>ส่งต่องานฝ่ายการเงิน</strong><small>TXT · สรุปสิ่งที่ต้องติดตาม</small></span><i data-icon="arrow-up-right"></i></button>
                 </div>
               </section>
-              <div class="prompts" aria-label="คำถามที่ใช้บ่อย">
-                <button
-                  type="button"
-                  data-prompt="ลาพักร้อนต้องยื่นล่วงหน้ากี่วัน"
-                >
-                  <i data-icon="calendar-days"></i>ขั้นตอนลาพักร้อน
-                </button>
-                <button
-                  type="button"
-                  data-prompt="ค่าแท็กซี่เบิกได้สูงสุดกี่บาทต่อเที่ยว"
-                >
-                  <i data-icon="banknote"></i>เบิกค่าเดินทาง
-                </button>
-                <button id="ask-cases" type="button" data-prompt="ดูเคสของฉัน">
-                  <i data-icon="inbox"></i>ดูเคสของฉัน
-                </button>
-              </div>
               <p id="chat-progress" role="status"></p>
             </div>
           </div>
@@ -231,7 +222,9 @@
             ติดตามการรับเรื่องและคำตอบจากเจ้าหน้าที่
           </p>
           </div>
-          <div class="filter-bar">
+          <form class="filter-bar" id="queue-controls">
+            <a href="#queue" id="all-cases" class="text-link" hidden>กลับไปดูทุกเคส</a>
+            <label id="case-search" class="searchfield"><i data-icon="search"></i><input id="case-q" type="search" maxlength="160" placeholder="ค้นหาด้วยคำถามหรือเลขเคส" aria-label="ค้นหาด้วยคำถามหรือเลขเคส"></label>
             <label for="case-state">สถานะงาน</label>
             <select id="case-state">
               <option value="">ทุกสถานะ</option>
@@ -239,10 +232,10 @@
               <option value="in_progress">กำลังดำเนินการ</option>
               <option value="resolved">ปิดรายการแล้ว</option>
             </select>
-            <button id="refresh" class="outline">
-              <i data-icon="refresh-cw"></i>รีเฟรช
+            <button id="refresh" type="submit" class="outline">
+              <i data-icon="refresh-cw"></i><span id="case-submit">แสดงผล</span>
             </button>
-          </div>
+          </form>
           <div id="tickets" aria-live="polite"></div>
         </section>
         <section id="admin" class="subpage" hidden>
