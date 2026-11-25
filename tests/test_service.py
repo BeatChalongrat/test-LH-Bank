@@ -310,7 +310,7 @@ def test_email_skill_requires_a_cited_policy_in_own_chat(system):
 
 
 def test_case_tool_is_private_and_turn_retries_are_idempotent(system):
-    api, keys, _, _ = system
+    api, keys, engine, _ = system
     path = "/api/conversations/" + str(uuid4()) + "/messages"
     body = dict(question="บริษัทมีสวัสดิการค่าเล่าเรียนบุตรไหม", turn_id=str(uuid4()))
     r = api.post(path, headers=keys["one"], json=body)
@@ -341,7 +341,10 @@ def test_case_tool_is_private_and_turn_retries_are_idempotent(system):
     assert ref in result["attribution"] and "รอรับเรื่อง" in result["answer"]
     detail = "/api/tickets/" + ref
     assert api.get(detail, headers=keys["two"]).status_code == 404
-    assert api.get(detail, headers=keys["one"]).json()["id"] == ref
+    own_detail = api.get(detail, headers=keys["one"]).json()
+    assert own_detail["id"] == ref
+    assert own_detail["conversation_id"] == path.split("/")[-2]
+    assert api.get(detail, headers=keys["review"]).json()["conversation_id"] is None
     assert [
         row["id"]
         for row in api.get(
@@ -394,6 +397,9 @@ def test_case_tool_is_private_and_turn_retries_are_idempotent(system):
         json=dict(turn_id=str(uuid4()), question="สถานะเคส " + ref),
     ).json()
     assert other["reason"] == "case_not_visible" and ref not in other["answer"]
+    with engine.begin() as conn:
+        activate(conn, "updated-policy")
+    assert api.get(detail, headers=keys["one"]).json()["conversation_id"] is None
 
 
 def test_admin_controls_access_and_audit(system):

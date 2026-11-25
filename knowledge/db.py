@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 
 import sqlalchemy as sa
@@ -13,6 +14,8 @@ C = sa.Column
 T = sa.String
 LOCAL_EMBEDDING_SPACE = "multilingual-e5-small-761b726"
 MANAGED_REVISION = "managed-pdf-v1"
+PRIVATE_REV = "private-chat-only"
+RETENTION = 30 * 86400
 ROLE_BITS = {"employee": 1, "reviewer": 2, "executive": 4, "admin": 8}
 
 accounts = sa.Table(
@@ -521,6 +524,22 @@ def revision_value():
 
 def revision(conn):
     return conn.scalar(sa.select(revision_value()))
+
+
+def current_thread_revision():
+    return sa.or_(
+        conversations.c.revision == revision_value(),
+        conversations.c.revision == PRIVATE_REV,
+    )
+
+
+def allowed_threads(user):
+    return sa.and_(
+        conversations.c.subject == user.subject,
+        conversations.c.role == user.role,
+        current_thread_revision(),
+        conversations.c.updated >= time.time() - RETENTION,
+    )
 
 
 def visible_chunks(role, base, subject=""):

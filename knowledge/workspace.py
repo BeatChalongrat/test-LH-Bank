@@ -10,15 +10,18 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .db import (
     MANAGED_REVISION,
+    allowed_threads,
     assignments,
     base_revision,
     case_activity,
     case_documents,
     chunks,
+    conversations,
     documents,
     managed_access,
     set_scope,
     tickets,
+    turns,
     visible_chunks,
 )
 from .security import redact
@@ -157,9 +160,20 @@ def install_workspace(app, current):
                 .mappings()
                 .first()
             )
-        if not item:
-            raise HTTPException(404)
-        return item
+            if not item:
+                raise HTTPException(404)
+            origin = None
+            if item["subject"] == user.subject:
+                origin = conn.scalar(
+                    sa.select(turns.c.conversation)
+                    .select_from(conversations.join(turns))
+                    .where(
+                        allowed_threads(user),
+                        turns.c.result["ticket_id"].as_string() == ticket_id,
+                    )
+                    .limit(1)
+                )
+        return {**item, "conversation_id": origin}
 
     @app.get("/api/tickets")
     def queue(

@@ -307,6 +307,14 @@ function ticket(r) {
   );
   box.append(top, el("h3", r.question), el("small", "เลขที่ " + r.id, "meta"));
   if (r.owner) box.append(el("p", "ผู้รับผิดชอบ · " + idName(r.owner), "meta"));
+  const caseView = "queue/" + encodeURIComponent(r.id);
+  if (location.hash !== "#" + caseView || r.conversation_id) {
+    const links = el("p", undefined, "action-row");
+    const link = el("a", r.conversation_id ? "กลับไปแชตที่ถาม" : "ดูรายละเอียดเรื่อง", "text-link");
+    link.href = r.conversation_id ? "/?chat=" + encodeURIComponent(r.conversation_id) + "#ask" : "#" + caseView;
+    links.append(link);
+    box.append(links);
+  }
   const history = el("details", undefined, "request-history");
   const toggle = el("summary");
   toggle.append(icon("history-clock"), el("span", "ประวัติของเรื่องนี้"));
@@ -351,12 +359,12 @@ function ticket(r) {
       b.disabled = true;
       try {
         await api("/api/tickets/" + r.id + "/claim", {});
-        await show("queue");
+        if (box.isConnected && view === "queue") go(caseView);
       } catch (err) {
         message(err.message);
         b.disabled = false;
       }
-    });
+    }, "primary");
     box.append(b);
   }
   if (canReview && r.state === "in_progress" && r.owner === me.subject) {
@@ -367,6 +375,7 @@ function ticket(r) {
     text.minLength = 3;
     text.maxLength = 2000;
     text.rows = 3;
+    text.placeholder = "เขียนคำตอบให้ผู้แจ้งอ่าน พร้อมระบุที่มาหากมี";
     text.id = "resolution-" + r.id;
     label.htmlFor = text.id;
     const save = el("button", "บันทึกและปิดรายการ", "primary");
@@ -375,7 +384,7 @@ function ticket(r) {
       release.disabled = true;
       try {
         await api("/api/tickets/" + r.id + "/release", {});
-        await show("queue");
+        if (box.isConnected && view === "queue") go(caseView);
       } catch (err) {
         message(err.message);
         release.disabled = false;
@@ -389,7 +398,7 @@ function ticket(r) {
         await api("/api/tickets/" + r.id + "/resolve", {
           resolution: text.value,
         });
-        await show("queue");
+        if (box.isConnected && view === "queue") go(caseView);
       } catch (err) {
         message(err.message);
         save.disabled = false;
@@ -558,7 +567,7 @@ $("queue-controls").onsubmit = (event) => {
 function source(s) {
   const details = el("details", undefined, "source");
   details.append(
-    el("summary", s.doc_id + " · " + s.title),
+    el("summary", "ดูแหล่งอ้างอิง · " + s.doc_id + " · " + s.title),
     el("p", meta(s), "meta"),
     el("p", s.body, "answer"),
   );

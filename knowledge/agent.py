@@ -25,12 +25,14 @@ from .provider import ProviderCoolingDown
 from pydantic import BaseModel, ConfigDict, Field
 
 from .db import (
+    PRIVATE_REV,
+    allowed_threads,
     assignments,
     conversations,
+    current_thread_revision,
     events,
     insert_for,
     revision,
-    revision_value,
     tickets,
     turn_artifacts,
     tool_changes,
@@ -43,7 +45,6 @@ from .provider_profiles import active_profile
 from .response_policy import POLICY_REF, POLICY_URL
 from .workspace import case_clearance
 
-RETENTION = 30 * 86400
 FOLLOWUP = re.compile(
     r"^(?:(?:แล้ว|ถ้าอย่างนั้น|กรณีนี้|เรื่องนี้|ตามระเบียบนี้|ในกรณีนั้น)\s*)?(?:ต้อง\s*)?(?:ยื่น|แนบ|แจ้ง|ส่ง|ใช้แบบฟอร์ม|ขออนุมัติ|ใช้ระบบ|ใครอนุมัติ|ผ่านระบบ|ใครเป็นคนอนุมัติ|ล่วงหน้า|เบิกได้เท่าไร)"
 )
@@ -85,25 +86,6 @@ class ToolChange(BaseModel):
     version: int = Field(ge=1)
 
 
-PRIVATE_REV = "private-chat-only"
-
-
-def current_revision():
-    return sa.or_(
-        conversations.c.revision == revision_value(),
-        conversations.c.revision == PRIVATE_REV,
-    )
-
-
-def allowed_threads(user):
-    return sa.and_(
-        conversations.c.subject == user.subject,
-        conversations.c.role == user.role,
-        current_revision(),
-        conversations.c.updated >= time.time() - RETENTION,
-    )
-
-
 @dataclass
 class PendingTurn:
     conversation: str
@@ -125,7 +107,7 @@ class PendingTurn:
                 conversations.c.id == self.conversation,
                 conversations.c.lease == self.lease,
                 conversations.c.revision == self.revision,
-                current_revision(),
+                current_thread_revision(),
             )
             .values(last_id=self.turn, lease=None, lease_end=0, updated=now)
         )
