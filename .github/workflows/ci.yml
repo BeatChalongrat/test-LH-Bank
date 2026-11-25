@@ -38,6 +38,11 @@ jobs:
       - run: python scripts/hr_demo.py setup
       - run: python scripts/hr_demo.py verify
       - run: python scripts/hr_demo.py verify-flow
+      - name: Verify the personal MCP tools with HR and non-HR accounts
+        run: |
+          python -m venv var/mcp-env
+          var/mcp-env/bin/python -m pip install -r integrations/mcp/requirements.txt
+          var/mcp-env/bin/python scripts/check_mcp.py
       - name: Show service startup diagnostics
         if: failure()
         run: docker compose logs --tail 60 api indexer

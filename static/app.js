@@ -226,8 +226,10 @@ function docRow(s) {
   return b;
 }
 async function home(seq) {
+  const reviewer = ["reviewer", "executive"].includes(me?.role);
+  $("queue-link").textContent = reviewer ? "ดูเรื่องรอเจ้าหน้าที่ดูแล" : "ดูเรื่องที่แจ้งไว้";
   $("support-hint").textContent =
-    me && ["reviewer", "executive"].includes(me.role)
+    reviewer
       ? "รายการที่อยู่ในขอบเขตงานของคุณ"
       : "สถานะคำถามที่ส่งให้เจ้าหน้าที่ตรวจสอบ";
   if (!me) {
@@ -305,8 +307,10 @@ function ticket(r) {
   );
   box.append(top, el("h3", r.question), el("small", "เลขที่ " + r.id, "meta"));
   if (r.owner) box.append(el("p", "ผู้รับผิดชอบ · " + idName(r.owner), "meta"));
-  const history = el("details", undefined, "source");
-  history.append(el("summary", "ประวัติการดำเนินงาน"));
+  const history = el("details", undefined, "request-history");
+  const toggle = el("summary");
+  toggle.append(icon("history-clock"), el("span", "ประวัติของเรื่องนี้"));
+  history.append(toggle);
   history.ontoggle = async () => {
     if (!history.open || history.childElementCount > 1) return;
     const line = el("ul", undefined, "timeline");
@@ -336,8 +340,8 @@ function ticket(r) {
       message(err.message);
     }
   };
+  if (r.resolution) box.append(el("strong", "คำตอบจากเจ้าหน้าที่"), el("p", r.resolution, "notice"));
   box.append(history);
-  if (r.resolution) box.append(el("p", r.resolution, "notice"));
   const canReview =
     me &&
     ((me.role === "reviewer" && r.scope === "staff") ||
@@ -401,6 +405,9 @@ async function show(name) {
       ? "admin"
       : "home";
   const seq = ++epoch;
+  const handlesRequests = ["reviewer", "executive"].includes(me?.role);
+  $("queue-title").textContent = $("queue-nav-label").textContent =
+    handlesRequests ? "เรื่องรอเจ้าหน้าที่ดูแล" : "เรื่องที่แจ้งไว้";
   $("admin-link").hidden = me?.role !== "admin";
   $("chat-actions").hidden = !me || view !== "ask";
   $("greeting").textContent = me
@@ -447,7 +454,7 @@ async function show(name) {
       $("case-state").hidden = $("case-search").hidden = $("queue-controls").querySelector('label[for="case-state"]').hidden = !!caseId;
       $("case-submit").textContent = caseId ? "รีเฟรช" : "แสดงผล";
       if (caseId) {
-        $("queue-description").textContent = "รายละเอียดและผลตรวจสอบของเคส";
+        $("queue-description").textContent = "ดูสถานะ คำตอบจากเจ้าหน้าที่ และประวัติของเรื่องนี้";
         try {
           const row = await api("/api/tickets/" + caseId);
           if (seq === epoch) $(target).replaceChildren(ticket(row));
@@ -459,8 +466,8 @@ async function show(name) {
       $("queue-description").textContent = ["employee", "admin"].includes(
         me.role,
       )
-        ? "ติดตามการรับเรื่องและคำตอบของคุณ"
-        : "ตรวจรายการ รับผิดชอบเคส และบันทึกผลการตรวจสอบ";
+        ? "เมื่อผู้ช่วยหาคำตอบจากเอกสารไม่ได้ คำถามจะส่งให้เจ้าหน้าที่ คุณดูสถานะและอ่านคำตอบได้ที่นี่"
+        : "เลือกเรื่องที่ต้องตรวจสอบ กดรับผิดชอบ แล้วบันทึกคำตอบให้ผู้แจ้ง";
       const filters = new URLSearchParams();
       if ($("case-state").value) filters.set("state", $("case-state").value);
       if ($("case-q").value.trim()) filters.set("q", $("case-q").value.trim());

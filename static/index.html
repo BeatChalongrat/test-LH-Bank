@@ -37,10 +37,10 @@
             ><i data-icon="book-open"></i>คลังเอกสาร</a
           >
           <a href="#queue" data-view="queue"
-            ><i data-icon="inbox"></i>งานสนับสนุน</a
+            ><i data-icon="inbox"></i><span id="queue-nav-label">เรื่องที่แจ้งไว้</span></a
           >
           <a href="#ask" data-view="ask"
-            ><i data-icon="messages-square"></i>แชตผู้ช่วย AI</a
+            ><i data-icon="assistant-chat"></i>แชตผู้ช่วย AI</a
           >
           <a href="/admin" id="admin-link" data-view="admin" hidden
             ><i data-icon="shield-check"></i>ผู้ดูแล AI</a
@@ -98,7 +98,7 @@
                 ถามผู้ช่วย AI หรือติดตามเรื่องที่ส่งให้เจ้าหน้าที่
               </p>
               <div class="hero-actions"><a class="primary" href="#ask"
-                ><i data-icon="messages-square"></i>เปิดแชตผู้ช่วย AI</a
+                ><i data-icon="assistant-chat"></i>เปิดแชตผู้ช่วย AI</a
               ><a class="outline" href="#library"><i data-icon="folder-open"></i>ค้นเอกสาร</a></div>
             </div>
           </div>
@@ -134,20 +134,20 @@
             <section class="support block">
               <div class="section-head">
                 <i class="tint" data-icon="headphones"></i>
-                <h2>ติดตามงานสนับสนุน</h2>
+                <h2>ติดตามเรื่องที่แจ้ง</h2>
               </div>
               <p class="muted" id="support-hint">
                 สถานะคำถามที่ส่งให้เจ้าหน้าที่ตรวจสอบ
               </p>
               <div id="case-summary"></div>
-              <a id="queue-link" href="#queue" class="outline">เปิดรายการงาน</a>
+              <a id="queue-link" href="#queue" class="outline">ดูเรื่องที่แจ้งไว้</a>
             </section>
           </div>
         </section>
         <section id="ask" class="chat-page" aria-label="แชตผู้ช่วย AI" hidden>
           <div class="chat-stage">
             <div id="chat-intro">
-              <div class="welcome-mark" aria-hidden="true"><i data-icon="messages-square"></i></div>
+              <div class="welcome-mark" aria-hidden="true"><i data-icon="assistant-chat"></i></div>
               <p id="greeting">ผู้ช่วยพนักงาน</p>
               <h1>วันนี้ให้ช่วยเรื่องอะไร?</h1>
             </div>
@@ -166,10 +166,10 @@
                 <label class="sr" for="question">ข้อความถึงผู้ช่วย / Message</label>
                 <textarea id="question" rows="1" maxlength="1200" minlength="2" required placeholder="ถามเรื่องงาน หรือแนบไฟล์ให้ช่วยวิเคราะห์…" autocomplete="off"></textarea>
                 <div class="composer-controls">
-                  <button type="button" id="pick-chat-file" class="compose-action" title="แนบไฟล์ / Attach file"><i data-icon="upload"></i><span>แนบไฟล์</span></button>
+                  <button type="button" id="pick-chat-file" class="compose-action" title="แนบไฟล์ / Attach file"><i data-icon="paperclip"></i><span>แนบไฟล์</span></button>
                   <input id="chat-file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.csv,.md,.txt" hidden>
                   <button type="button" class="composer-stop" id="stop-chat" hidden>หยุด / Stop</button>
-                  <button type="submit" class="composer-send" id="submitq" aria-label="ส่งข้อความ / Send" title="ส่งข้อความ (Enter)"><i data-icon="arrow-up-right"></i></button>
+                  <button type="submit" class="composer-send" id="submitq" aria-label="ส่งข้อความ / Send" title="ส่งข้อความ (Enter)"><i data-icon="arrow-up"></i></button>
                 </div>
               </form>
               <section id="work-starters" aria-labelledby="work-heading">
@@ -177,7 +177,7 @@
                 <div class="sample-grid">
                   <button type="button" class="sample-card" data-prompt="บิลค่าเดินทางหาย ทำไงดี"><span class="file-tile sheet"><i data-icon="banknote"></i></span><span><strong>ใบเสร็จหาย</strong><small>ดูขั้นตอนและแบบฟอร์ม</small></span><i data-icon="arrow-up-right"></i></button>
                   <button type="button" class="sample-card" data-prompt="ลาพักร้อนต้องยื่นล่วงหน้ากี่วัน"><span class="file-tile pdf"><i data-icon="calendar-days"></i></span><span><strong>วางแผนลาพักร้อน</strong><small>ดูระยะเวลายื่นคำขอ</small></span><i data-icon="arrow-up-right"></i></button>
-                  <button type="button" id="ask-cases" class="sample-card" data-prompt="ดูเคสของฉัน"><span class="file-tile note"><i data-icon="inbox"></i></span><span><strong>ติดตามเรื่องที่แจ้งไว้</strong><small>ดูสถานะและผลจากเจ้าหน้าที่</small></span><i data-icon="arrow-up-right"></i></button>
+                  <button type="button" id="ask-cases" class="sample-card" data-prompt="ดูเรื่องที่แจ้งไว้"><span class="file-tile note"><i data-icon="inbox"></i></span><span><strong>ติดตามเรื่องที่แจ้งไว้</strong><small>ดูสถานะและผลจากเจ้าหน้าที่</small></span><i data-icon="arrow-up-right"></i></button>
                 </div>
               </section>
               <section id="sample-files" aria-labelledby="sample-heading">
@@ -217,15 +217,15 @@
         </section>
         <section id="queue" class="subpage" hidden>
           <div class="page-heading">
-          <h1>งานสนับสนุน</h1>
+          <h1 id="queue-title">เรื่องที่แจ้งไว้</h1>
           <p class="lead" id="queue-description">
             ติดตามการรับเรื่องและคำตอบจากเจ้าหน้าที่
           </p>
           </div>
           <form class="filter-bar" id="queue-controls">
             <a href="#queue" id="all-cases" class="text-link" hidden>กลับไปดูทุกเคส</a>
-            <label id="case-search" class="searchfield"><i data-icon="search"></i><input id="case-q" type="search" maxlength="160" placeholder="ค้นหาด้วยคำถามหรือเลขเคส" aria-label="ค้นหาด้วยคำถามหรือเลขเคส"></label>
-            <label for="case-state">สถานะงาน</label>
+            <label id="case-search" class="searchfield"><i data-icon="search"></i><input id="case-q" type="search" maxlength="160" placeholder="ค้นด้วยคำถามหรือเลขที่เรื่อง" aria-label="ค้นด้วยคำถามหรือเลขที่เรื่อง"></label>
+            <label for="case-state">สถานะเรื่อง</label>
             <select id="case-state">
               <option value="">ทุกสถานะ</option>
               <option value="open">รอรับเรื่อง</option>
@@ -239,67 +239,34 @@
           <div id="tickets" aria-live="polite"></div>
         </section>
         <section id="admin" class="subpage" hidden>
-          <div class="section-head page-heading">
-            <h1>จัดการผู้ช่วย / Admin</h1>
-            <button id="admin-refresh" class="outline"><i data-icon="refresh-cw"></i>รีเฟรช / Refresh</button>
-          </div>
-          <nav class="admin-steps" id="admin-steps" aria-label="ขั้นตอนการตั้งค่า / Setup steps" hidden>
-            <button class="outline" type="button" id="step-connect">1 · เชื่อม AI / Connect</button>
-            <button class="outline" type="button" id="step-upload">2 · เพิ่มเอกสาร / Add files</button>
-            <button class="outline" type="button" id="step-test">3 · ลองถาม / Test chat</button>
+          <header class="admin-heading">
+            <div><h1>ตั้งค่าผู้ช่วย</h1><p>จัดการโมเดล เอกสาร และสิทธิ์การอ่าน</p></div>
+            <button id="admin-refresh" type="button" class="outline"><i data-icon="refresh-cw"></i><span>โหลดข้อมูลล่าสุด</span></button>
+          </header>
+          <p id="admin-updated" class="meta" role="status"></p>
+          <nav class="admin-steps" id="admin-steps" aria-label="เครื่องมือผู้ดูแล" hidden>
+            <button type="button" id="step-connect" disabled><i data-icon="plugs-connected"></i><span>เชื่อมต่อโมเดล<small lang="en">Connect model</small></span></button>
+            <button type="button" id="step-upload"><i data-icon="file-plus"></i><span>เพิ่มเอกสาร<small lang="en">Upload document</small></span></button>
+            <button type="button" id="step-test"><i data-icon="assistant-chat"></i><span>เปิดแชตทดสอบ<small lang="en">Open chat</small></span></button>
           </nav>
           <section id="admin-providers" class="admin-card provider-panel" hidden aria-labelledby="providers-heading">
             <div class="section-head">
-              <div><h2 id="providers-heading">เชื่อม AI / Connect AI</h2><p class="muted" id="provider-caption"></p></div>
-              <button type="button" id="provider-add" disabled class="outline"><i data-icon="plus"></i>เพิ่มการเชื่อมต่อ / Add connection</button>
+              <div><h2 id="providers-heading">โมเดลที่ใช้ <small lang="en">Connections</small></h2><p class="muted" id="provider-caption"></p></div>
+
             </div>
             <div id="provider-rows"></div>
             <p id="provider-result" role="status"></p>
           </section>
           <section id="admin-documents" class="admin-card" hidden>
             <div class="section-head">
-              <h2>เอกสารที่ใช้ตอบ / Knowledge library</h2>
+              <h2>เอกสารที่ใช้ตอบ <small lang="en">Knowledge library</small></h2>
               <button id="open-departments" class="outline" type="button">
                 <i data-icon="team"></i>จัดการแผนก / Departments
               </button>
-              <button id="document-refresh" class="outline" type="button">
-                <i data-icon="refresh-cw"></i>โหลดใหม่ / Refresh
-              </button>
+
             </div>
-            <div class="document-admin-grid">
-              <form id="pdf-upload">
-                <h3>เพิ่มเอกสาร / Add a document</h3>
-                <div class="file-picker">
-                  <label for="pdf-file"><i data-icon="upload"></i>เลือกไฟล์ / Choose file</label>
-                  <output id="selected-file" for="pdf-file">ยังไม่ได้เลือกไฟล์ / No file chosen</output>
-                <input
-                  type="file"
-                  id="pdf-file"
-                  accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.csv"
-                  required
-                  aria-describedby="pdf-limits"
-                />
-                </div>
-                <p id="pdf-limits" class="meta">
-                  PDF, Word, Excel, PowerPoint, TXT, Markdown และ CSV สูงสุด 15
-                  MB · PDF ไม่เกิน 80 หน้า
-                </p>
-                <label for="pdf-title">ชื่อเอกสาร / Document title</label>
-                <input id="pdf-title" required minlength="2" maxlength="160" />
-                <label for="pdf-owner">เจ้าของเอกสาร / Document owner</label>
-                <input id="pdf-owner" required minlength="2" maxlength="100" />
-                <p class="meta">ผู้ที่ตรงกับบทบาท แผนก หรือรายชื่ออย่างใดอย่างหนึ่งจะเห็นเอกสาร หากให้เฉพาะ HR ให้เลือกเพียงแผนก HR / Any selected group grants access. For HR only, select just the HR department.</p>
-                <fieldset class="role-options">
-                  <legend>ให้สิทธิ์ตามบทบาท / Roles</legend>
-                </fieldset>
-                <div class="scoped-readers"></div>
-                <button class="primary" type="submit">
-                  <i data-icon="upload"></i>เผยแพร่ให้ผู้ที่เลือก / Publish to readers
-                </button>
-                <p id="upload-status" role="status" class="meta"></p>
-              </form>
-              <div>
-                <h3>สถานะเอกสาร / Document status</h3>
+            <div class="document-list-panel">
+                <p id="publication-note" role="status" class="meta"></p>
                 <div id="managed-list" aria-live="polite"></div>
                 <div class="document-pages" aria-label="หน้าเอกสาร">
                   <button
@@ -319,7 +286,6 @@
                     หน้าถัดไป / Next
                   </button>
                 </div>
-              </div>
             </div>
           </section>
           <details class="admin-card" id="admin-operations" hidden><summary>การใช้งานและการแก้ปัญหา / Usage &amp; diagnostics</summary><div id="admin-content" aria-live="polite"></div></details>
@@ -339,7 +305,7 @@
       <p id="access-document" class="meta"></p>
       <form id="document-access">
         <p class="meta">ผู้ที่ตรงกับบทบาท แผนก หรือรายชื่ออย่างใดอย่างหนึ่งจะเห็นเอกสาร หากให้เฉพาะ HR ให้เลือกเพียงแผนก HR / Any selected group grants access. For HR only, select just the HR department.</p>
-                <fieldset class="role-options">
+        <fieldset class="role-options">
           <legend>ให้สิทธิ์ตามบทบาท / Roles</legend>
         </fieldset>
         <div class="scoped-readers"></div>
@@ -412,6 +378,40 @@
       </form>
       <p id="login-error" role="alert"></p>
       <button hidden id="logout" class="outline">ออกจากระบบ</button>
+    </dialog>
+    <dialog id="upload-dialog" aria-labelledby="upload-title">
+      <div class="dialog-head"><h2 id="upload-title">เพิ่มเอกสาร <small lang="en">Add document</small></h2>
+        <button type="button" class="quiet close" aria-label="ปิด"><i data-icon="x"></i></button></div>
+      <form id="pdf-upload">
+        <div class="file-picker">
+          <label for="pdf-file"><i data-icon="upload"></i>เลือกไฟล์ / Choose file</label>
+          <output id="selected-file" for="pdf-file">ยังไม่ได้เลือกไฟล์ / No file chosen</output>
+        <input
+          type="file"
+          id="pdf-file"
+          accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.csv"
+          required
+          aria-describedby="pdf-limits"
+        />
+        </div>
+        <p id="pdf-limits" class="meta">
+          PDF, Word, Excel, PowerPoint, TXT, Markdown และ CSV สูงสุด 15
+          MB · PDF ไม่เกิน 80 หน้า
+        </p>
+        <label for="pdf-title">ชื่อเอกสาร / Document title</label>
+        <input id="pdf-title" required minlength="2" maxlength="160" />
+        <label for="pdf-owner">เจ้าของเอกสาร / Document owner</label>
+        <input id="pdf-owner" required minlength="2" maxlength="100" />
+        <p class="meta">ผู้ที่ตรงกับบทบาท แผนก หรือรายชื่ออย่างใดอย่างหนึ่งจะเห็นเอกสาร หากให้เฉพาะ HR ให้เลือกเพียงแผนก HR / Any selected group grants access. For HR only, select just the HR department.</p>
+        <fieldset class="role-options">
+          <legend>ให้สิทธิ์ตามบทบาท / Roles</legend>
+        </fieldset>
+        <div class="scoped-readers"></div>
+        <button class="primary" type="submit">
+          <i data-icon="upload"></i>เผยแพร่ให้ผู้ที่เลือก / Publish to readers
+        </button>
+        <p id="upload-status" role="status" class="meta"></p>
+      </form>
     </dialog>
     <dialog id="provider-editor" aria-labelledby="provider-title">
       <form id="provider-form" class="provider-form">

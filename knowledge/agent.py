@@ -51,6 +51,7 @@ NEW_TOPIC = re.compile(
     r"ลาป่วย|ลาพักร้อน|ลาคลอด|ใบเสร็จหาย|ค่าแท็กซี่|ค่าเดินทาง|เงินเดือน|สวัสดิการ|CS-\d+", re.I
 )
 MY_CASES = re.compile(
+    r"(?:ช่วย)?(?:ดู|ขอดู|เช็ก|ติดตาม)?\s*เรื่องที่(?:ฉัน|ผม)?(?:แจ้งไว้|ส่งให้เจ้าหน้าที่)(?:หน่อย|ทั้งหมด|บ้าง)?(?:ครับ|ค่ะ|คะ)?[ ?？]*|"
     r"(?:ขอ(?:ดู|เช็ก|เช็ค)|ดู|เช็ก|เช็ค|ติดตาม|รายการ|สถานะ|สรุป)?\s*(?:สถานะ)?(?:เคส|งานส่งต่อ|คำร้อง|รายการส่งต่อ)(?:ของ)?(?:ฉัน|ผม|เรา|ดิฉัน)(?:มีอะไรบ้าง|อยู่ขั้นตอนไหน|ถึงไหนแล้ว|ทั้งหมด|ล่าสุด|บ้าง)?(?:ครับ|ค่ะ|คะ)?[ ?？]*|(?:show |list |check )?my (?:cases|tickets)[ ?.]*",
     re.I,
 )
@@ -155,11 +156,18 @@ EXPORT_REQUEST = re.compile(
     r"^(?:ช่วย|ขอ|กรุณา|please )?(?:แปลง|ทำ|ดาวน์โหลด|ส่งออก|บันทึก|export|save|download)\s*(?:คำตอบนี้|คำตอบก่อนหน้า|this|the answer)?\s*(?:เป็น|as|to)?\s*(?:ไฟล์)?\s*(pdf|pptx?|powerpoint|docx?|word|xlsx|excel|csv|markdown|md)\s*(?:ให้หน่อย|หน่อย|ด้วย|ครับ|ค่ะ)?[.! ]*$",
     re.I,
 )
+POLICY_EMAIL = re.compile(
+    r"(?:ร่าง|เขียน)\s*(?:อีเมล|เมล).*(?:คำตอบ(?:นี้|ก่อนหน้า)|ระเบียบนี้|นโยบายนี้)"
+    r"|(?:draft|write).*?email.*?(?:previous answer|this (?:answer|policy)|that (?:answer|policy))",
+    re.I,
+)
 
 
 def text_intent(body):
     if body.mode != "auto":
         return body.mode
+    if POLICY_EMAIL.search(body.question):
+        return "policy_email"
     if CALC_REQUEST.search(body.question):
         return "calculator"
     if body.parent_id and EXPORT_REQUEST.fullmatch(body.question):
@@ -302,14 +310,18 @@ def read_cases(engine, user, pending, ref, used_context):
         own = sa.and_(tickets.c.subject == user.subject, case_clearance(user))
         if user.role != "executive":
             own = sa.and_(own, tickets.c.scope == "staff")
-        status, reason, source = "answered", "tool_result", "ฐานงานสนับสนุน / เคสของฉัน"
+        status, reason, source = (
+            "answered",
+            "tool_result",
+            "รายการที่ส่งให้เจ้าหน้าที่ / เรื่องของฉัน",
+        )
         recent = []
         if not enabled:
             status, reason, source = "refused", "tool_disabled", "ระบบ / การตั้งค่าเครื่องมือ"
-            answer = "ขณะนี้ปิดเครื่องมือตรวจเคสในแชต คุณยังเปิดเมนูงานสนับสนุนได้"
+            answer = "ขณะนี้ปิดเครื่องมือตรวจเคสในแชต คุณยังเปิดหน้าเรื่องที่แจ้งไว้ได้"
         elif ref == "unspecified":
             status, reason, source = "refused", "case_id_required", "ระบบ / การระบุเคส"
-            answer = "กรุณาระบุเลขเคสจากเมนูงานสนับสนุน หรือพิมพ์ ดูเคสของฉัน เพื่อดูยอดรวม"
+            answer = "กรุณาระบุเลขเคสจากหน้าเรื่องที่แจ้งไว้ หรือพิมพ์ ดูเคสของฉัน เพื่อดูยอดรวม"
         elif ref:
             item = c.execute(
                 sa.select(
@@ -498,6 +510,8 @@ def install_agent(app, current, answer, run_model):
             if not blocked:
                 intent = text_intent(body)
                 if intent != "auto":
+                    if intent == "knowledge" and tool != intent:
+                        value, context = body.question, False
                     tool = intent
                 elif file:
                     tool = "data" if file["payload"]["table"] else "attachment"
@@ -634,6 +648,54 @@ def install_agent(app, current, answer, run_model):
                     }
                 return await anyio.to_thread.run_sync(
                     store_result, engine, user, pending, result, started
+                )
+            if tool == "policy_email":
+                stage("policy_email")
+                previous = pending.previous
+                grounded = (
+                    previous.get("tool") == "knowledge"
+                    and previous.get("status") == "answered"
+                )
+                sources = previous.get("sources", []) if grounded else []
+                if any(source.get("kind") != "policy" for source in sources):
+                    sources = []
+                english = not re.search(r"[ก-ฮ]", body.question)
+                if sources:
+                    topic = sources[0]["title"]
+                    opening = (
+                        f"Subject: {topic}\n\nDear team,\n\n"
+                        if english
+                        else f"เรื่อง {topic}\n\nเรียนทีมงาน\n\nขอแจ้งข้อมูลตามระเบียบที่เกี่ยวข้อง\n\n"
+                    )
+                    closing = (
+                        "\n\nRegards,\n[Name]"
+                        if english
+                        else "\n\nขอบคุณครับ/ค่ะ\n[ชื่อผู้ส่ง]"
+                    )
+                    text = opening + previous["answer"] + closing
+                else:
+                    text = (
+                        "Ask about the policy first, then request an email draft."
+                        if english
+                        else "ลองถามเรื่องระเบียบที่ต้องการก่อน เมื่อได้คำตอบพร้อมเอกสารอ้างอิงแล้ว ให้กดร่างอีเมลจากคำตอบนี้"
+                    )
+                result = dict(
+                    status="answered" if sources else "refused",
+                    reason="grounded_draft" if sources else "policy_answer_required",
+                    answer=text,
+                    confidence=None,
+                    sources=sources,
+                    attribution=sources[0]["ref"] if sources else POLICY_REF,
+                    policy_url=None if sources else POLICY_URL,
+                    revision=pending.revision,
+                    trace_id=uuid4().hex,
+                    ticket_id=None,
+                    cached=False,
+                    tool="policy_email",
+                    used_context=bool(sources),
+                )
+                return await anyio.to_thread.run_sync(
+                    store_result, engine, user, pending, result, time.time()
                 )
             if tool == "case_status":
                 stage("case_status")

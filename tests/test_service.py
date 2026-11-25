@@ -265,6 +265,50 @@ def test_persistent_conversation_and_citations(system):
     assert api.get(path, headers=keys["one"]).status_code == 404
 
 
+def test_chat_anecdote_and_official_limit_use_different_sources(system):
+    api, keys, _, _ = system
+    chat = ask(api, keys["one"], "ในแชต FIN-305 พนักงานถามเรื่องค่าแท็กซี่ว่าอะไร")
+    assert chat["sources"][0]["doc_id"] == "CHAT-03"
+    policy = ask(api, keys["one"], "ในแชต FIN-305 ตามระเบียบค่าแท็กซี่เบิกได้สูงสุดกี่บาทต่อเที่ยว")
+    assert policy["sources"][0]["doc_id"] == "FIN-01"
+    assert "600 บาท" in policy["answer"]
+
+
+def test_email_skill_requires_a_cited_policy_in_own_chat(system):
+    api, keys, _, _ = system
+    path = f"/api/conversations/{uuid4()}/messages"
+    question = {"question": "ค่าแท็กซี่เบิกได้สูงสุดกี่บาทต่อเที่ยว", "turn_id": str(uuid4())}
+    source = api.post(path, headers=keys["one"], json=question).json()
+    draft = {
+        "question": "ช่วยร่างอีเมลจากคำตอบก่อนหน้า",
+        "parent_id": question["turn_id"],
+        "turn_id": str(uuid4()),
+    }
+    reply = api.post(path, headers=keys["one"], json=draft).json()
+    assert reply["status"] == "answered" and reply["tool"] == "policy_email"
+    assert source["answer"] in reply["answer"] and "เรียนทีมงาน" in reply["answer"]
+    assert reply["sources"] == source["sources"] and reply["steps"] == [
+        "access",
+        "policy_email",
+    ]
+    assert api.post(path, headers=keys["one"], json=draft).json() == reply
+    assert api.post(path, headers=keys["two"], json=draft).status_code == 404
+    fresh = f"/api/conversations/{uuid4()}/messages"
+    standalone = dict(draft, parent_id=None)
+    denied = api.post(fresh, headers=keys["two"], json=standalone).json()
+    assert denied["status"] == "refused" and not denied["sources"]
+    cases = api.post(
+        fresh,
+        headers=keys["two"],
+        json={
+            "question": "ดูเรื่องที่แจ้งไว้",
+            "parent_id": standalone["turn_id"],
+            "turn_id": str(uuid4()),
+        },
+    ).json()
+    assert cases["tool"] == "case_status"
+
+
 def test_case_tool_is_private_and_turn_retries_are_idempotent(system):
     api, keys, _, _ = system
     path = "/api/conversations/" + str(uuid4()) + "/messages"

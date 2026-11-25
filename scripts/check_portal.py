@@ -69,6 +69,7 @@ def managed_pdf(browser, admin, employee, out):
     )
     pdf = pdf_page.pdf(format="A4")
     pdf_page.close()
+    admin.locator("#step-upload").click()
     form = admin.locator("#pdf-upload")
     form.locator("#pdf-file").set_input_files(
         {"name": "satellite-parking.pdf", "mimeType": "application/pdf", "buffer": pdf}
@@ -76,9 +77,9 @@ def managed_pdf(browser, admin, employee, out):
     form.locator("#pdf-title").fill(title)
     form.locator("#pdf-owner").fill("Finance")
     form.locator('input[value="executive"]').check()
-    form.get_by_role("button", name="อัปโหลดและจัดทำดัชนี").click()
+    form.get_by_role("button", name=re.compile("เผยแพร่ให้ผู้ที่เลือก")).click()
     row = admin.locator(".managed-doc").filter(has_text=title)
-    expect(row).to_contain_text("พร้อมใช้ในแชต", timeout=45000)
+    expect(row).to_contain_text("ถามในแชตได้แล้ว", timeout=45000)
     admin.screenshot(path=out / "admin.png", full_page=True)
 
     def sources(page):
@@ -152,7 +153,7 @@ def department_readers(browser, admin, employee, out):
     admin.locator("#open-departments").click()
     admin.locator("#department-code").fill(code)
     admin.locator("#department-name").fill(name)
-    admin.get_by_role("button", name="เพิ่มแผนก", exact=True).click()
+    admin.locator("#department-create button[type=submit]").click()
     expect(admin.locator("#membership-department")).to_have_value(code)
     admin.locator("#membership-query").fill("portal.staff")
     admin.locator("#membership-find").click()
@@ -172,6 +173,7 @@ def department_readers(browser, admin, employee, out):
     )
     pdf = pdf_page.pdf(format="A4")
     pdf_page.close()
+    admin.locator("#step-upload").click()
     form = admin.locator("#pdf-upload")
     form.locator("#pdf-file").set_input_files(
         {"name": "orchid-shuttle.pdf", "mimeType": "application/pdf", "buffer": pdf}
@@ -179,9 +181,9 @@ def department_readers(browser, admin, employee, out):
     form.locator("#pdf-title").fill(title)
     form.locator("#pdf-owner").fill("HR")
     form.locator(f'input[name="reader-department"][value="{code}"]').check()
-    form.get_by_role("button", name="อัปโหลดและจัดทำดัชนี").click()
+    form.get_by_role("button", name=re.compile("เผยแพร่ให้ผู้ที่เลือก")).click()
     row = admin.locator(".managed-doc").filter(has_text=title)
-    expect(row).to_contain_text("พร้อมใช้ในแชต", timeout=45000)
+    expect(row).to_contain_text("ถามในแชตได้แล้ว", timeout=45000)
 
     def ask_again(page):
         page.locator("[data-view=ask]").click()
@@ -218,7 +220,7 @@ def department_readers(browser, admin, employee, out):
     edit = admin.locator("#document-access")
     edit.locator(f'input[name="reader-department"][value="{code}"]').uncheck()
     edit.get_by_role("searchbox").fill("portal.peer")
-    edit.get_by_role("button", name="ค้นหา", exact=True).click()
+    edit.get_by_role("button", name="ค้นหา / Search", exact=True).click()
     edit.get_by_role("button", name="local/portal.peer", exact=True).click()
     edit.get_by_role("button", name="บันทึกสิทธิ์").click()
     expect(row.locator(".document-readers")).to_have_text("local/portal.peer")
@@ -278,6 +280,7 @@ def run(out):
         admin.on("pageerror", lambda err: errors.append(str(err)))
         login(admin, "portal.operations", "admin")
         admin.locator("#admin-link").click()
+        admin.locator("#admin-operations > summary").click()
         expect(admin.locator("#admin-content")).to_contain_text("knowledge-local")
         admin.screenshot(path=out / "admin.png", full_page=True)
 
@@ -286,10 +289,10 @@ def run(out):
             employee.locator("#question").press("Enter")
             return employee.locator(".chat-turn").last.locator(".agent-message")
 
-        admin.get_by_role("button", name="ปิดเครื่องมือตรวจเคส", exact=True).click()
+        admin.get_by_role("button", name="ปิดการตรวจเคส / Disable lookup").click()
         try:
             expect(
-                admin.get_by_role("button", name="เปิดเครื่องมือตรวจเคส", exact=True)
+                admin.get_by_role("button", name="เปิดการตรวจเคส / Enable lookup")
             ).to_be_visible()
             expect(query_cases()).to_contain_text("ขณะนี้ปิดเครื่องมือ")
             employee.locator("#question").fill("ลาพักร้อนต้องยื่นล่วงหน้ากี่วัน")
@@ -298,11 +301,11 @@ def run(out):
                 "3 วันทำงาน", timeout=35000
             )
         finally:
-            admin.get_by_role("button", name="เปิดเครื่องมือตรวจเคส", exact=True).click()
+            admin.get_by_role("button", name="เปิดการตรวจเคส / Enable lookup").click()
         expect(
-            admin.get_by_role("button", name="ปิดเครื่องมือตรวจเคส", exact=True)
+            admin.get_by_role("button", name="ปิดการตรวจเคส / Disable lookup")
         ).to_be_visible()
-        expect(query_cases()).to_contain_text("ฐานงานสนับสนุน / เคสของฉัน")
+        expect(query_cases()).to_contain_text("รายการที่ส่งให้เจ้าหน้าที่ / เรื่องของฉัน")
         employee.screenshot(path=out / "chat.png")
         employee.locator("[data-view=library]").click()
         employee.locator("#doc-q").fill("EX-01")
@@ -320,7 +323,7 @@ def run(out):
         expect(employee.locator("#result")).to_contain_text(
             "ส่งต่อให้เจ้าหน้าที่แล้ว", timeout=35000
         )
-        employee.get_by_role("button", name="ติดตามรายการ").click()
+        employee.get_by_role("button", name="ติดตามเรื่องนี้").click()
         own = employee.locator(".ticket").filter(has_text=question)
         expect(own).to_be_visible()
         reviewer = browser.new_context().new_page()
@@ -336,7 +339,7 @@ def run(out):
         own.locator("summary").click()
         expect(own.locator(".timeline")).to_contain_text("portal.support")
         employee.locator("[data-view=ask]").click()
-        expect(employee).to_have_url(f"{BASE}/#ask")
+        expect(employee).to_have_url(re.compile(r"#ask$"))
         expect(employee.locator("#ask")).to_be_visible()
         employee.set_viewport_size({"width": 390, "height": 844})
         employee.reload()

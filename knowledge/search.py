@@ -19,20 +19,23 @@ def query_text(query):
 def retrieve(conn, encoder, query, role, revision, limit=3, subject="", vector=None):
     set_scope(conn, role, subject)
     query = query_text(query)
-    kind = (
-        "chat"
-        if re.search(r"\b(?:CS|HR|FIN)-\d{3,}\b|ในแชต|ในแชท", query, re.I)
-        else "policy"
+    case_ids = re.findall(r"(?:CS|HR|FIN)-\d{3,}\b", query, re.I)
+    mentions_chat = bool(case_ids or re.search(r"ในแช[ตท]", query))
+    asks_policy = re.search(
+        r"ตาม(?:นโยบาย|ระเบียบ)|ระเบียบ(?:จริง|กำหนด|ว่า)|official policy|under (?:the )?policy",
+        query,
+        re.I,
     )
+    kind = "chat" if mentions_chat and not asks_policy else "policy"
     vec = encoder.encode([query], "query")[0] if vector is None else vector
     stmt = sa.select(chunks).where(
         revision_value() == revision,
         visible_chunks(role, revision.split(":", 1)[0], subject),
         chunks.c.kind == kind,
     )
-    case_ids = re.findall(r"\b(?:CS|HR|FIN)-\d{3,}\b", query, re.I)
-    for identifier in set(case_ids):
-        stmt = stmt.where(chunks.c.tags.ilike("%" + identifier + "%"))
+    if kind == "chat":
+        for identifier in set(case_ids):
+            stmt = stmt.where(chunks.c.tags.ilike("%" + identifier + "%"))
     if conn.dialect.name == "postgresql":
         conn.execute(sa.text("SET LOCAL hnsw.iterative_scan = strict_order"))
         stmt = stmt.order_by(chunks.c.embedding.cosine_distance(vec)).limit(40)

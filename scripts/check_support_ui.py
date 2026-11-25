@@ -54,9 +54,14 @@ def main():
         expect(employee.locator(".history-entry[aria-current]")).to_have_text(
             "การเบิกเมื่อใบเสร็จสูญหาย"
         )
+        employee.get_by_role("button", name="ร่างอีเมลจากคำตอบนี้").click()
+        employee.locator("#submitq").click()
+        expect(turn).to_have_attribute("data-tool", "policy_email")
+        expect(turn.locator(".agent-message > .answer")).to_contain_text("เรียนทีมงาน")
+        expect(turn.locator(".source summary")).to_contain_text("FIN-02")
         employee.locator("#question").fill("เบิกค่าแท็กซี่ต่างประเทศได้สูงสุดเท่าไร")
         employee.locator("#submitq").click()
-        follow = employee.get_by_role("button", name="ติดตามรายการ")
+        follow = employee.get_by_role("button", name="ติดตามเรื่องนี้")
         expect(follow).to_be_visible(timeout=45000)
         chat_url = employee.url
         follow.click()

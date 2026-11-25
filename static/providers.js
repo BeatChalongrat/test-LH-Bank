@@ -58,7 +58,7 @@ async function loadProviders(seq) {
   const data = await api("/api/admin/providers");
   if (seq !== epoch || me?.role !== "admin") return;
   providerState = data;
-  $("provider-add").disabled = false;
+  $("step-connect").disabled = false;
   const list = $("provider-rows");
   list.replaceChildren();
   $("provider-caption").textContent =
@@ -192,7 +192,7 @@ async function loadProviders(seq) {
 }
 
 $("provider-purpose").onchange = fillVendors;
-$("provider-add").onclick = () => editProvider(null);
+$("step-connect").onclick = () => editProvider(null);
 $("provider-close").onclick = () => providerEditor.close();
 providerEditor.addEventListener("close", () => {
   $("provider-key").value = "";

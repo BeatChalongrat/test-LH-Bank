@@ -63,6 +63,8 @@ function resetDocuments() {
   $("managed-list").replaceChildren();
   $("pdf-upload").reset();
   $("upload-status").textContent = "";
+  $("publication-note").textContent = "";
+  if ($("upload-dialog").open) $("upload-dialog").close();
   if ($("access-dialog").open) $("access-dialog").close();
 }
 
@@ -149,12 +151,12 @@ async function loadDocuments(seq = epoch) {
       rows.some((doc) => doc.status === "queued" || doc.status === "indexing")
     )
       documentTimer = setTimeout(() => loadDocuments(seq), 2400);
+    return true;
   } catch (err) {
     if (seq === epoch && currentRequest === documentRequest)
       $("managed-list").replaceChildren(empty(err.message));
   }
 }
-$("document-refresh").onclick = () => loadDocuments();
 $("documents-prev").onclick = () => {
   documentOffset = Math.max(0, documentOffset - documentPageSize);
   loadDocuments();
@@ -219,7 +221,10 @@ $("pdf-upload").onsubmit = async (event) => {
     if (me?.subject !== subject) return;
     form.reset();
     readerFields.get(form).reset();
-    status.textContent = "รับไฟล์แล้ว ดูสถานะในรายการเอกสาร / Uploaded. Check document status below.";
+    $("publication-note").textContent = "รับไฟล์ " + file.name + " แล้ว ติดตามสถานะได้ในรายการนี้";
+    status.textContent = "";
+    $("upload-dialog").close();
+    $("admin-documents").scrollIntoView({ block: "start" });
     documentOffset = 0;
     await loadDocuments();
   } catch (err) {

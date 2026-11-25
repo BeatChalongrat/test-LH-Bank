@@ -60,13 +60,14 @@ function renderTurn(question, r, chat, turnId, steps = []) {
               sheet_report: "รายงานจากไฟล์แนบ / Spreadsheet report",
               export: "พร้อมดาวน์โหลด / Ready to export",
               draft: "ร่างเอกสาร / Draft",
+              policy_email: "ร่างอีเมลสำหรับตรวจทาน",
               calculator: "ผลคำนวณ / Calculation",
               data: "ข้อมูลในไฟล์ / File data",
               attachment: "ข้อความในไฟล์ / File passages",
             }[r.tool] || "คำตอบจากเอกสาร";
   const byline = el("div", undefined, "assistant-byline"),
     mark = el("span", undefined, "reply-mark");
-  mark.append(icon("messages-square"));
+  mark.append(icon("assistant-chat"));
   byline.append(mark, el("strong", "ผู้ช่วยพนักงาน"));
   reply.append(byline);
   const report = r.tool === "sheet_report" && r.summary && r.table;
@@ -77,7 +78,7 @@ function renderTurn(question, r, chat, turnId, steps = []) {
     if (r.artifact?.format === "pptx" && chat && turnId)
       reply.append(slideDownload(chat, turnId, r));
   } else {
-    if (r.status !== "answered") reply.append(el("strong", label));
+    if (r.status !== "answered" || r.tool === "policy_email") reply.append(el("strong", label));
     reply.append(el("p", r.answer, "answer"));
   }
   if (r.used_context)
@@ -102,9 +103,16 @@ function renderTurn(question, r, chat, turnId, steps = []) {
     attribution.replaceChildren(link);
   }
   if (!report) reply.append(attribution);
+  if (r.tool === "knowledge" && r.status === "answered" && r.sources.length && r.sources.every(s => s.kind === "policy"))
+    reply.append(button("ร่างอีเมลจากคำตอบนี้", () => {
+      if (sending || chat !== chatId || turnId !== lastTurn) return;
+      const input = $("question");
+      if (!input.value.trim()) input.value = "ช่วยร่างอีเมลแจ้งทีมจากคำตอบก่อนหน้า";
+      input.focus();
+    }, "outline draft-policy"));
   if (r.recent_cases?.length) {
     const list = el("div", undefined, "chat-case-list");
-    list.append(el("strong", "เคสล่าสุด"));
+    list.append(el("strong", "เรื่องที่แจ้งล่าสุด"));
     for (const item of r.recent_cases) {
       const link = el("a");
       link.href = "#queue/" + encodeURIComponent(item.id);
@@ -114,9 +122,9 @@ function renderTurn(question, r, chat, turnId, steps = []) {
     reply.append(list);
   }
   const caseId = r.ticket_id || r.case_ref;
-  if (caseId) reply.append(button("ติดตามรายการ", () => go("queue/" + encodeURIComponent(caseId))));
+  if (caseId) reply.append(button("ติดตามเรื่องนี้", () => go("queue/" + encodeURIComponent(caseId))));
   else if (r.tool === "case_status" && r.status === "answered")
-    reply.append(button("ดูงานสนับสนุนทั้งหมด", () => go("queue")));
+    reply.append(button("ดูเรื่องที่แจ้งไว้ทั้งหมด", () => go("queue")));
   const info = el("details", undefined, "trace");
   info.append(
     el("summary", "ที่มาและขั้นตอน / Sources & steps"),
@@ -345,6 +353,8 @@ function adminCard(title) {
 async function showAdmin(seq) {
   const root = $("admin-content");
   const permitted = me?.role === "admin";
+  $("admin-refresh").hidden = !permitted;
+  $("admin-updated").textContent = "";
   $("admin-steps").hidden = $("admin-operations").hidden = !permitted;
   $("admin-gate").textContent = permitted
     ? ""
@@ -361,17 +371,19 @@ async function showAdmin(seq) {
     root.replaceChildren(empty("บัญชีนี้ไม่มีสิทธิ์เปิดหน้าผู้ดูแล AI"));
     return;
   }
-  $("provider-add").disabled = true;
-  loadProviders(seq).catch((error) => {
+  $("step-connect").disabled = true;
+  const providersReady = loadProviders(seq).then(() => true).catch((error) => {
     if (seq === epoch) $("provider-result").textContent = error.message;
+    return false;
   });
   root.replaceChildren(empty("กำลังโหลด…"));
-  refreshDepartments()
-    .then(() => loadDocuments(seq))
-    .catch((err) => {
-      if (seq === epoch) loadDocuments(seq);
-    });
-  const data = await api("/api/admin/agent");
+  const documentsReady = refreshDepartments().then(
+    () => loadDocuments(seq),
+    async () => { await loadDocuments(seq); return false; },
+  );
+  const [data, providersLoaded, documentsLoaded] = await Promise.all([
+    api("/api/admin/agent"), providersReady, documentsReady,
+  ]);
   if (seq !== epoch) return;
   const stats = adminCard("ผลการตอบใน 24 ชั่วโมง / Last 24 hours"),
     grid = el("div", undefined, "admin-stats");
@@ -447,9 +459,25 @@ async function showAdmin(seq) {
   if (!data.reasons.length)
     reasons.append(el("p", "ยังไม่มีรายการ / No entries", "muted"));
   root.replaceChildren(stats, model, tool, audit, reasons);
+  $("admin-updated").textContent = providersLoaded && documentsLoaded
+    ? "อัปเดตล่าสุด " + new Date().toLocaleTimeString("th-TH", { hour12: false })
+    : "โหลดข้อมูลได้บางส่วน กรุณากดโหลดข้อมูลล่าสุดอีกครั้ง";
 }
-$("admin-refresh").onclick = () => show("admin");
-$("step-connect").onclick = () => $("provider-add").focus();
-$("step-upload").onclick = () => $("pdf-file").focus();
-$("step-test").onclick = () => go("ask");
+$("admin-refresh").onclick = async (event) => {
+  const control = event.currentTarget;
+  control.disabled = true;
+  control.querySelector("span").textContent = "กำลังโหลด…";
+  try {
+    await show("admin");
+  } finally {
+    control.disabled = false;
+    control.querySelector("span").textContent = "โหลดข้อมูลล่าสุด";
+  }
+};
+$("step-upload").onclick = () => $("upload-dialog").showModal();
+$("step-test").onclick = () => {
+  resetChat();
+  linkedChat = null;
+  go("ask");
+};
 boot();

@@ -2,6 +2,7 @@
 let attachedFile = null;
 let activeStream = null;
 const stageLabels = {
+  policy_email: "จัดทำร่างอีเมลจากหลักฐาน / Draft email from evidence",
   plan: "เลือกเครื่องมือสำหรับรายงาน / Plan report",
   aggregate: "รวมยอดจากแถวข้อมูล / Aggregate rows",
   chart: "สร้างกราฟจากยอดรวม / Build chart",

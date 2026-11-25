@@ -1133,11 +1133,6 @@ dialog h2 {
 #admin-documents {
   margin: 24px 0;
 }
-.document-admin-grid {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(0, 1.45fr);
-  gap: 24px;
-}
 #pdf-upload,
 #document-access {
   display: grid;
@@ -1236,11 +1231,6 @@ dialog h2 {
 #access-status:empty {
   display: none;
 }
-@media (max-width: 700px) {
-  .document-admin-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 
 .scope-people {
   margin: 6px 0;
@@ -1338,8 +1328,77 @@ dialog h2 {
 .response-actions {margin-top:1rem}
 .chat-toolbar [hidden],.admin-steps[hidden],#admin-operations[hidden] {display:none}
 #chat-file-chip {max-width:100%;overflow-wrap:anywhere}
-.admin-steps {margin-bottom:1.15rem}
-.admin-steps button {flex:1 1 11rem;justify-content:flex-start}
+.admin-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.admin-heading p { margin: 5px 0 0; color: var(--muted); }
+#admin-updated { min-height: 1.4em; margin: 8px 0 18px; }
+.admin-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(155px, 100%), 1fr));
+  margin-bottom: 20px;
+}
+.admin-steps button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: start;
+  padding: 14px;
+  background: white;
+  border: 1px solid #c6d8e2;
+  border-radius: 10px;
+  color: #24485e;
+  font-weight: 650;
+}
+.admin-steps button:hover { background: #f0f7fb; border-color: #74a4bf; }
+.admin-steps .icon { width: 24px; height: 24px; flex: none; color: var(--blue); }
+.admin-steps small, #admin h2 small, #upload-title small {
+  display: block;
+  font: 400 .78rem/1.5 PortalThai, sans-serif;
+  color: var(--muted);
+}
+#upload-dialog { width: min(36rem, calc(100% - 24px)); max-height: 90dvh; overflow: auto; }
+#upload-title { margin: 0; }
+#pdf-upload { grid-template-columns: minmax(0, 1fr); }
+#pdf-upload :is(fieldset, input, output), .managed-doc { min-width: 0; max-width: 100%; }
+dialog :is(button.primary, button.outline), .managed-doc button {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 420px) {
+  #upload-dialog { padding: 16px; }
+  #upload-dialog .identity-search { flex-direction: column; }
+  #upload-dialog .identity-search input { width: 100%; flex: auto; }
+  #upload-dialog .identity-search button { align-self: flex-start; }
+}
+#publication-note:empty { display: none; }
+#admin { container-type: inline-size; }
+@container (max-width: 680px) {
+  #admin-content { grid-template-columns: minmax(0, 1fr); }
+  .admin-list { grid-template-columns: minmax(0, 1fr); }
+  .admin-list dd { margin: 0 0 6px; }
+}
+details > summary { list-style: none; cursor: pointer; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::marker { content: ""; }
+details > summary:not(.export-menu > summary)::after {
+  content: "+";
+  font: 500 1.05rem/1 system-ui;
+  margin-inline-start: .55rem;
+  color: #42718a;
+}
+details[open] > summary:not(.export-menu > summary)::after { content: "−"; }
+.request-history { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+.request-history summary { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; color: var(--blue); }
+.request-history summary .icon { width: 18px; height: 18px; }
+.request-history .timeline { padding-inline-start: 24px; }
+.ticket :is(h3, small, .notice) { overflow-wrap: anywhere; }
 #admin-operations {margin-top:1.4rem}
 #admin-operations summary,.trace summary {cursor:pointer}
 #admin-content {margin-top:1rem}
