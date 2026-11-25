@@ -81,6 +81,8 @@ def main():
         reviewer.get_by_role("button", name="คืนงานเข้าคิว").click()
         expect(reviewer.locator(".ticket .status")).to_have_text("รอรับเรื่อง")
         reviewer.get_by_role("button", name="รับผิดชอบเคสนี้").click()
+        expect(reviewer.locator(".ticket .status")).to_have_text("กำลังดำเนินการ")
+        expect(reviewer.locator(".ticket textarea")).to_be_visible()
         expect(reviewer.get_by_role("link", name="กลับไปแชตที่ถาม")).to_have_count(0)
         reviewer.screenshot(path=output / "reviewer-actions.png")
         reviewer.get_by_role("button", name="บันทึกและปิดรายการ").click()
